@@ -1,14 +1,11 @@
 <mxfile host="65bd71144e">
     <diagram id="cUtYkas2dYg9eTsDe-bJ" name="Page-1">
-        <mxGraphModel dx="-225" dy="97" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="850" pageHeight="1100" background="none" math="0" shadow="0">
+        <mxGraphModel dx="-171" dy="180" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="850" pageHeight="1100" background="none" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
-                <mxCell id="2" value="P" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Times New Roman;fontColor=#009999;fontSize=16;rotation=-180;" parent="1" vertex="1">
-                    <mxGeometry x="401" y="271" width="46" height="21" as="geometry"/>
-                </mxCell>
-                <mxCell id="3" value="L" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Times New Roman;fontColor=#009999;fontSize=16;" vertex="1" parent="1">
-                    <mxGeometry x="410" y="271" width="46" height="21" as="geometry"/>
+                <mxCell id="3" value="P/L" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Times New Roman;fontColor=#009999;fontSize=16;" parent="1" vertex="1">
+                    <mxGeometry x="480" y="283" width="46" height="21" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>

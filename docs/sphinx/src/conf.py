@@ -30,11 +30,12 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # -- Options for HTML output -------------------------------------------------
 html_theme = "furo"
-html_title = f"P/L {project_version}"
+html_title = f"Penrose-Lamarck"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
 release = project_version
 version = project_version
+html_favicon = "_static/tab_header_logo.svg"
 
 # Furo theme tweaks
 html_theme_options = {
