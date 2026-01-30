@@ -1,4 +1,0 @@
-Mermaid is a markdown-style scripting language for drawing graphs. Due to its
-text nature it integrates well with LLMs. Mermaid works natively in many file
-types like README.md and HTML files and also integrates with VS Code and
-JetBrains IDEs.

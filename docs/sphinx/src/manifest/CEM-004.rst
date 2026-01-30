@@ -6,10 +6,13 @@ For context, refer to ODD - Outcome Driven Development.
 State Machine (CEM-004-000)  
 --------------------------------------
 
-Specification  🤖
-~~~~~~~~~~~~~~~~~
+Specification
+~~~~~~~~~~~~~
 
-.. include:: ./CEM-004-000.rst
+The manifest specifies a formal, human-and-machine-readable language for
+defining the artifacts of intent — desired outcomes and the processes to
+achieve them — using state machines.
+
 
 Language Requirements
 ~~~~~~~~~~~~~~~~~~~~~
@@ -92,10 +95,12 @@ machine can also be represented by a Euclidean graph.
 ODD State Machine Schema (CEM-004-001)  
 -------------------------------------------------
 
-Specification  🤖
-~~~~~~~~~~~~~~~~~
+Specification
+~~~~~~~~~~~~~
 
-.. include:: ./CEM-004-001.rst
+The current draft schema for the ODD state machine definition is documented in
+the following file: File.
+
 
 Schema Elements
 ~~~~~~~~~~~~~~~

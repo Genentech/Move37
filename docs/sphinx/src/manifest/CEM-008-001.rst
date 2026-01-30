@@ -1,2 +1,0 @@
-GitHub Copilot is a recommended coding assistant. Login in VS Code with SSO via
-Roche credentials. Download the extension.

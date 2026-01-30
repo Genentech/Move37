@@ -7,7 +7,9 @@ Lucid Chart (CEM-007-000)
 Specification  🤖
 ~~~~~~~~~~~~~~~~~
 
-.. include:: ./CEM-007-000.rst
+Lucid Chart is a charting software for designing diagrams. It is available for
+Roche users; sign-on via Roche SSO.
+
 
 Motivation
 ~~~~~~~~~~
@@ -19,10 +21,14 @@ Motivation
 Mermaid (CEM-007-001)  
 -----------------------------------
 
-Specification  🤖
-~~~~~~~~~~~~~~~~~
+Specification
+~~~~~~~~~~~~~
 
-.. include:: ./CEM-007-001.rst
+Mermaid is a markdown-style scripting language for drawing graphs. Due to its
+text nature it integrates well with LLMs. Mermaid works natively in many file
+types like README.md and HTML files and also integrates with VS Code and
+JetBrains IDEs.
+
 
 Motivation
 ~~~~~~~~~~
@@ -33,10 +39,12 @@ Motivation
 Draw.io (CEM-007-002)  
 -----------------------------------
 
-Specification  🤖
-~~~~~~~~~~~~~~~~~
+Specification
+~~~~~~~~~~~~~
 
-.. include:: ./CEM-007-002.rst
+Draw.io is a charting software for designing diagrams. It is available for
+Roche users; sign-on via Roche SSO.
+
 
 Motivation
 ~~~~~~~~~~

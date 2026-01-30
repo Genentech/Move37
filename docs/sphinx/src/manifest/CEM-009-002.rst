@@ -1,5 +1,0 @@
-ONA provides a secure, ephemeral development environment in Roche's VPC. It
-creates pre-configured standardized environments, enabling quick onboarding.
-ONA also provides "ONA agents" connecting the development environment to Claude code.
-
-Onboarding and documentation: ONA.

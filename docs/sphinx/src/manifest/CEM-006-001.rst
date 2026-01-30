@@ -1,2 +1,0 @@
-Any commit must be a verified commit, i.e., it must contain cryptographic
-evidence that it was made by the person it claims to be from.

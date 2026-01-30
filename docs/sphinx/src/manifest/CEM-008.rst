@@ -4,10 +4,12 @@ Coding Agents (CEM-008)
 Codex (CEM-008-000)  
 ------------------------------
 
-Specification  🤖
-~~~~~~~~~~~~~~~~~
+Specification
+~~~~~~~~~~~~~
 
-.. include:: ./CEM-008-000.rst
+The OpenAI Codex is a recommended coding assistant. You can login in VS Code
+with SSO via Roche credentials. Download the extension.
+
 
 Motivation
 ~~~~~~~~~~
@@ -17,10 +19,12 @@ Motivation
 Copilot (CEM-008-001)  
 -----------------------------------
 
-Specification  🤖
-~~~~~~~~~~~~~~~~~
+Specification
+~~~~~~~~~~~~~
 
-.. include:: ./CEM-008-001.rst
+GitHub Copilot is a recommended coding assistant. Login in VS Code with SSO via
+Roche credentials. Download the extension.
+
 
 Motivation
 ~~~~~~~~~~
@@ -30,10 +34,13 @@ Motivation
 Claude code / ONA (CEM-008-002)  
 ------------------------------------------
 
-Specification  🤖
-~~~~~~~~~~~~~~~~~
+Specification
+~~~~~~~~~~~~~
 
-.. include:: ./CEM-008-002.rst
+Claude code is a terminal-based coding assistant. Access via ONA using SSO via
+Roche credentials. Once a repository is accessed you can open Claude code via a
+terminal using the ``claude`` command.
+
 
 Motivation
 ~~~~~~~~~~

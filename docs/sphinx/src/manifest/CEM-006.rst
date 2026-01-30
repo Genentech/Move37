@@ -37,12 +37,14 @@ Blueprint
 - Claude Config File TODO add URL to GitHub repo
 
 Verified Commits (CEM-006-001)  
------------------------------------------
+------------------------------
 
-Specification  🤖
-~~~~~~~~~~~~~~~~~
+Specification
+~~~~~~~~~~~~~
 
-.. include:: ./CEM-006-001.rst
+Any commit must be a verified commit, i.e., it must contain cryptographic
+evidence that it was made by the person it claims to be from.
+
 
 Motivation
 ~~~~~~~~~~

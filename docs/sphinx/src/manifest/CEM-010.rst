@@ -4,10 +4,12 @@ Hiring (CEM-010)
 Technical Assessment in the Age of AI (CEM-010-000)  
 ---------------------------------------------------
 
-Specification  🤖
-~~~~~~~~~~~~~~~~~
+Specification
+~~~~~~~~~~~~~
 
-.. include:: ./CEM-010-000.rst
+The technical assessment must accurately assess a candidate's software
+engineering skillset using AI coding assistants.
+
 
 Blueprint
 ~~~~~~~~~

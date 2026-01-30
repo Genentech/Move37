@@ -1,2 +1,0 @@
-The technical assessment must accurately assess a candidate's software
-engineering skillset using AI coding assistants.

@@ -1,3 +1,0 @@
-The manifest specifies a formal, human-and-machine-readable language for
-defining the artifacts of intent — desired outcomes and the processes to
-achieve them — using state machines.

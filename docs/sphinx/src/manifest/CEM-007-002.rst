@@ -1,2 +1,0 @@
-Draw.io is a charting software for designing diagrams. It is available for
-Roche users; sign-on via Roche SSO.

@@ -1,2 +1,0 @@
-The VS Code + Docker engine + Devcontainer + EC2 | AZ VM setup is a recommended
-remote development environment.

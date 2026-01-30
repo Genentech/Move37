@@ -1,2 +1,0 @@
-The OpenAI Codex is a recommended coding assistant. You can login in VS Code
-with SSO via Roche credentials. Download the extension.

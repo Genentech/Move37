@@ -4,10 +4,11 @@ Development Environment (CEM-009)
 IDE (CEM-009-000)  
 -------------------------------
 
-Specification  🤖
-~~~~~~~~~~~~~~~~~
+Specification
+~~~~~~~~~~~~~
 
-.. include:: ./CEM-009-000.rst
+VS Code is the recommended IDE.
+
 
 Motivation
 ~~~~~~~~~~
@@ -17,10 +18,12 @@ TODO
 VS Code + Docker + Devcontainer + EC2 | AZ VM (CEM-009-001)  
 --------------------------------------------------------------------------
 
-Specification  🤖
-~~~~~~~~~~~~~~~~~
+Specification
+~~~~~~~~~~~~~
 
-.. include:: ./CEM-009-001.rst
+The VS Code + Docker engine + Devcontainer + EC2 | AZ VM setup is a recommended
+remote development environment.
+
 
 AWS Architecture Diagram
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -39,10 +42,15 @@ Motivation
 ONA (CEM-009-002)  
 ----------------------------
 
-Specification  🤖
-~~~~~~~~~~~~~~~~~
+Specification
+~~~~~~~~~~~~~
 
-.. include:: ./CEM-009-002.rst
+ONA provides a secure, ephemeral development environment in Roche's VPC. It
+creates pre-configured standardized environments, enabling quick onboarding.
+ONA also provides "ONA agents" connecting the development environment to Claude code.
+
+Onboarding and documentation: ONA.
+
 
 Motivation
 ~~~~~~~~~~

@@ -1,3 +1,0 @@
-Claude code is a terminal-based coding assistant. Access via ONA using SSO via
-Roche credentials. Once a repository is accessed you can open Claude code via a
-terminal using the ``claude`` command.
