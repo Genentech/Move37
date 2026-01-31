@@ -1,5 +1,7 @@
-CEM-012 Documentation
-=====================
+Documentation
+=============
+
+``CEM-012``
 
 🤖 CEM-012-000 Function Docstrings
 ----------------------------------

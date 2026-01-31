@@ -1,0 +1,2 @@
+- for a small number of users use Auth0
+- for a larger number of users use Okta

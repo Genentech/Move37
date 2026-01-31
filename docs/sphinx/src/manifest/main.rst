@@ -17,3 +17,9 @@ Manifest
     CEM-010.rst
     CEM-011-modus.rst
     CEM-012-docs.rst
+    CEM-013-auth.rst
+    CEM-014-llm.rst
+    CEM-015-async.rst
+    CEM-016-sync.rst
+    CEM-017-policy.rst
+    CEM-018-audit.rst

@@ -1,0 +1,1 @@
+- If it is important to find relationships between data points, rather than distance, use GraphDB.
