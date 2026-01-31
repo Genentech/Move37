@@ -7,7 +7,7 @@ Manifest
 
     CEM-000.rst
     CEM-001.rst
-    CEM-002.rst
+    CEM-002-storage.rst
     CEM-003.rst
     CEM-004.rst
     CEM-006.rst
