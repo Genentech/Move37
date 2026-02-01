@@ -1,9 +1,9 @@
+import json
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
-import json
-import re
 
 # -- Project information -----------------------------------------------------
 project = "Penrose-Lamarck"
@@ -16,10 +16,10 @@ copyright = f"{current_year}, {author} • {project_version}"
 
 # -- General configuration ---------------------------------------------------
 extensions = [
-    "myst_parser",            # Support existing .md files
-    "sphinx_copybutton",     # Copy buttons on code blocks
-    "sphinx_design",         # Cards, grids, tabs
-    "sphinxcontrib.mermaid", # Mermaid diagrams
+    "myst_parser",  # Support existing .md files
+    "sphinx_copybutton",  # Copy buttons on code blocks
+    "sphinx_design",  # Cards, grids, tabs
+    "sphinxcontrib.mermaid",  # Mermaid diagrams
 ]
 
 # Allow both RST and Markdown sources
@@ -30,13 +30,13 @@ source_suffix = {
 
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
- 
+
 # Allow reStructuredText "include" directive
 file_insertion_enabled = True
 
 # -- Options for HTML output -------------------------------------------------
 html_theme = "furo"
-html_title = f"Penrose-Lamarck"
+html_title = "Penrose-Lamarck"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
 release = project_version
@@ -96,6 +96,7 @@ pygments_dark_style = "dracula"
 # -- Engineering Manifest build hook ----------------------------------------
 _MANIFEST_SRC = Path(__file__).parent / "manifest"
 
+
 def _emit_engineering_manifest(outdir: str) -> None:
     """
     Generate manifest.json from all CEM-*-*.rst files under the manifest folder.
@@ -130,10 +131,12 @@ def _emit_engineering_manifest(outdir: str) -> None:
     payload = json.dumps(data, ensure_ascii=False, indent=2)
     out_path.write_text(payload, encoding="utf-8")
 
+
 def _on_build_finished(app, exception):
     # Only emit on successful builds to avoid stale/partial files
     if exception is None:
         _emit_engineering_manifest(app.outdir)
+
 
 def setup(app):
     # Hook into Sphinx lifecycle to generate manifest.json alongside HTML output

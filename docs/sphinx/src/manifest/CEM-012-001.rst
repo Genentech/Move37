@@ -31,4 +31,3 @@
    --------
    :meth:`MyClass.run`, :mod:`mypkg.othermodule`
    """
-    

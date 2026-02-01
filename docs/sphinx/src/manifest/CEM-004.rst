@@ -3,7 +3,7 @@ Outcome Driven Development (ODD) (CEM-004)
 
 For context, refer to ODD - Outcome Driven Development.
 
-State Machine (CEM-004-000)  
+State Machine (CEM-004-000)
 --------------------------------------
 
 Specification
@@ -92,7 +92,7 @@ The state machine may be deterministic or nondeterministic and represented by
 acyclic, cyclic, oriented, or non-oriented graphs. Where applicable, the state
 machine can also be represented by a Euclidean graph.
 
-ODD State Machine Schema (CEM-004-001)  
+ODD State Machine Schema (CEM-004-001)
 -------------------------------------------------
 
 Specification

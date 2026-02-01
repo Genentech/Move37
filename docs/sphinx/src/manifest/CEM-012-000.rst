@@ -18,7 +18,7 @@
 
         Throws (optional)
         -----------------
-        
+
         ExceptionType
             Description of the exception condition.
 
@@ -29,15 +29,14 @@
 
         Returns
         -------
-        
+
         return type
             Description of the return value.
 
         Examples
         --------
-        
+
         >>> result = functionName(example_parameter)
         >>> print(result)
         42
         """
-    

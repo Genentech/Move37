@@ -23,3 +23,4 @@ Manifest
     CEM-016-sync.rst
     CEM-017-policy.rst
     CEM-018-audit.rst
+    CEM-019-code-std.rst

@@ -457,4 +457,3 @@ input[type="search"] { border: 1px solid var(--border); }
   [data-theme="auto"] .content h2 { color: var(--color-foreground-secondary) !important; }
   [data-theme="auto"] .content h3 { color: color-mix(in srgb, var(--color-foreground-secondary), black 20%) !important; }
 }
-

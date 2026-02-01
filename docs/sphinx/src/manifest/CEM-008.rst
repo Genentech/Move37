@@ -1,7 +1,7 @@
 Coding Agents (CEM-008)
 =======================
 
-Codex (CEM-008-000)  
+Codex (CEM-008-000)
 ------------------------------
 
 Specification
@@ -16,7 +16,7 @@ Motivation
 
 - Augmented coding assistant integrated with VS Code.
 
-Copilot (CEM-008-001)  
+Copilot (CEM-008-001)
 -----------------------------------
 
 Specification
@@ -31,7 +31,7 @@ Motivation
 
 - Augmented coding assistant integrated with VS Code.
 
-Claude code / ONA (CEM-008-002)  
+Claude code / ONA (CEM-008-002)
 ------------------------------------------
 
 Specification

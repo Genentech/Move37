@@ -1,7 +1,7 @@
 Hiring (CEM-010)
 ================
 
-Technical Assessment in the Age of AI (CEM-010-000)  
+Technical Assessment in the Age of AI (CEM-010-000)
 ---------------------------------------------------
 
 Specification

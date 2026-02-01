@@ -14,7 +14,7 @@ Emphasis
 - **Actionable Blueprints:** Rules are paired with ready-to-use repositories.
 - **Formal Intent:** Outcomes are modeled with machine-readable state machines.
 
-Getting Started (CEM-000-000)  
+Getting Started (CEM-000-000)
 -------------------------------------------
 
 Back decisions with a CEM rule ID wherever possible:
@@ -25,7 +25,7 @@ Back decisions with a CEM rule ID wherever possible:
 
 If a rule is missing or needs refinement, see ``CEM-000-001``.
 
-Contributing (CEM-000-001)  
+Contributing (CEM-000-001)
 --------------------------
 
 To add or refine a rule, follow ``CEM-001-000``.
@@ -40,7 +40,7 @@ To add or refine a rule, follow ``CEM-001-000``.
    Follow recommendations, but alternative implementations are welcome if you
    document the choice and inform the team.
 
-Agent Ingestion Guidelines (CEM-000-002)  
+Agent Ingestion Guidelines (CEM-000-002)
 -----------------------------------------
 
 Keep agent-loaded specs minimal and enforceable:
@@ -63,7 +63,7 @@ Exclude (examples):
 - ADRs or historical commentary.
 - Platform choices that do not affect code generation.
 
-Glossary (CEM-000-003)  
+Glossary (CEM-000-003)
 ------------------------------------
 
 .. list-table:: Glossary of Terms
@@ -78,4 +78,3 @@ Glossary (CEM-000-003)
        - Artifacts of Intent
        - Functional outcomes/behaviours vs. their implementation
        - CEM-004-000
-

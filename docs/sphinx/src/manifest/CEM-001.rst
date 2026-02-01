@@ -4,7 +4,7 @@ Manifest Structure (CEM-001)
 The Catalyx Engineering Manifest is a dynamic, versioned document composed of
 uniquely identifiable recommendations, platform/service suggestions, and architectural patterns.
 
-Versioning and Rule Identification (CEM-001-000)  
+Versioning and Rule Identification (CEM-001-000)
 --------------------------------------------------------------
 
 .. list-table:: Specification Parameters
@@ -33,7 +33,7 @@ Versioning and Rule Identification (CEM-001-000)
      - File/URL
      - URL to plug-n-play component (mandatory when applicable).
 
-Further Sections (CEM-001-001)  
+Further Sections (CEM-001-001)
 --------------------------------------------
 
 The manifest is developed over time by refining existing recommendations or

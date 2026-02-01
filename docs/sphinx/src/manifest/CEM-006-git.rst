@@ -6,7 +6,7 @@ Version Control
 Standardizing the use of Git ensures a clean history, simplifies automated
 tooling, and improves the review process.
 
-Commit Message Formatting (CEM-006-000)  
+Commit Message Formatting (CEM-006-000)
 -----------------------------------------------------
 
 Specification  🤖
@@ -38,7 +38,7 @@ Blueprint
 - Codex Config File TODO add URL to GitHub repo
 - Claude Config File TODO add URL to GitHub repo
 
-Verified Commits (CEM-006-001)  
+Verified Commits (CEM-006-001)
 ------------------------------
 
 Specification

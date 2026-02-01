@@ -1,4 +1,4 @@
-Penrose-Lamarck 
+Penrose-Lamarck
 ================
 
 Craft your mind for the age of AI.

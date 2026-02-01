@@ -3,7 +3,7 @@ Storage
 
 ``CEM-002``
 
-🤖 Relational Data  
+🤖 Relational Data
 ---------------
 
 ``CEM-002-000``

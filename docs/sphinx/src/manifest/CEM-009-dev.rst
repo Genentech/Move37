@@ -3,7 +3,7 @@ Development Environment
 
 ``CEM-009``
 
-IDE  
+IDE
 ---
 
 ``CEM-009-000``
@@ -121,7 +121,7 @@ Motivation
 - Cloud-native approach: use AWS/AZ extensively. EC2 or AZ VM are recommended
   VMs for hosting development environments, enabling scalable compute/memory/network.
 
-Remote (ONA)  
+Remote (ONA)
 ------------
 
 ``CEM-009-002``
