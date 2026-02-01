@@ -33,3 +33,4 @@ openssh-client
 imagemagick
 nginx
 ufw
+shfmt

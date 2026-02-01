@@ -30,15 +30,18 @@ repos:
       - id: shellcheck
         files: ^.*\.sh$
 
-  - repo: https://github.com/scop/pre-commit-shfmt
-    rev: v3.7.0-2
+  - repo: local
     hooks:
       - id: shfmt
-        args: ["-i", "4", "-sr"]
-        files: ^.*\.sh$
+        name: shfmt
+        entry: shfmt
+        language: system
+        types: [shell]
+        args: ["-i", "4", "-sr", "-w"]
 
   - repo: https://github.com/hadolint/hadolint
     rev: v2.12.0
     hooks:
       - id: hadolint
+        args: ["--failure-threshold", "error"]
         files: ^(Dockerfile|.*Dockerfile|.*\.Dockerfile|.*/Dockerfile)$

@@ -47,6 +47,6 @@
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
     "source=${localEnv:HOME}/.ssh,target=/home/${localEnv:USER}/.ssh,type=bind"
   ],
-  "postCreateCommand": "python3 -m pip install --upgrade --user pip setuptools wheel && python3 -m pip install --user -e '.[utils,test]'",
-  "postStartCommand": "sudo chown ${localEnv:USER}:docker /var/run/docker.sock && sudo chmod 660 /var/run/docker.sock"
+	"postCreateCommand": "bash .devcontainer/scripts/postCreate.sh",
+	"postStartCommand": "bash .devcontainer/scripts/postStart.sh"
 }

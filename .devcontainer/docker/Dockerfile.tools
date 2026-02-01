@@ -1,5 +1,13 @@
 # Build tools image
 FROM ghcr.io/genentech/penrose-lamarck-devcontainer-base:1.0.0
+# Ensure base system requirements are installed from manifest
+COPY .devcontainer/sys-requirements.txt /tmp/sys-requirements.txt
+RUN apt-get update \
+    && xargs -a /tmp/sys-requirements.txt apt-get install -y --no-install-recommends \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm /tmp/sys-requirements.txt
+
 
 LABEL version="1.0.0"
 
@@ -33,3 +41,22 @@ RUN curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
   && sudo apt install ngrok \
   && apt clean \
   && rm -rf /var/lib/apt/lists/*
+
+# Install hadolint (apt if available, otherwise fallback to GitHub release)
+RUN set -eux; \
+    if ! command -v hadolint >/dev/null 2>&1; then \
+        if apt-get update && apt-get install -y hadolint; then \
+            echo "hadolint installed via apt."; \
+        else \
+            echo "apt install failed; fetching hadolint binary..."; \
+            DL_TARGET="/usr/local/bin/hadolint"; \
+            curl -fsSL -o "$DL_TARGET" "https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64"; \
+            chmod +x "$DL_TARGET"; \
+            echo "hadolint installed to $DL_TARGET"; \
+        fi; \
+    else \
+        echo "hadolint already present."; \
+    fi
+
+# Install pre-commit globally (tools image)
+RUN python3 -m pip install --no-cache-dir --upgrade pre-commit ruff
