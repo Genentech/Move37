@@ -1,0 +1,9 @@
+-r alembic/python-requirements.txt
+-r api/python-requirements.txt
+-r core/python-requirements.txt
+-r db/python-requirements.txt
+-r mcp/python-requirements.txt
+-r models/python-requirements.txt
+-r repositories/python-requirements.txt
+-r schemas/python-requirements.txt
+-r services/python-requirements.txt

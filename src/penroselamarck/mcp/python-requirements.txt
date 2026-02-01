@@ -1,0 +1,7 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.0
+pydantic==2.6.4
+SQLAlchemy==2.0.34
+psycopg2-binary==2.9.10
+opentelemetry-api==1.27.0
+opentelemetry-sdk==1.27.0
