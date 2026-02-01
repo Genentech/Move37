@@ -44,7 +44,7 @@ ENV PYTHONUNBUFFERED=1 \
 ## ⚠️ ATTENTION ⚠️
 ##
 ## - ONLY requirement files are copied at build time to maximize cache hits. The layer is only invalidated when requirements change.
-## - The list of requirement files varies with project structure, UPDATE ./python-requirements.txt as needed.
+## - The list of requirement files varies with project structure, UPDATE ./python-requirements.txt AND the list below as needed
 ##
 ## ------------------------------------------------------------------
 COPY python-requirements.txt /tmp/requirements/services.txt
