@@ -4,7 +4,7 @@ Live documentation: https://genentech.github.io/penrose-lamarck/
 
 ## Contributing
 
-[Fork](https://github.com/Genentech/penrose-lamarck/fork) the project, pick an [issue](https://github.com/Genentech/penrose-lamarck/issues) and submit a PR! We're looking forward to answering your questions on the issue thread.
+[Fork](https://github.com/genentech/penrose-lamarck/fork) the project, pick an [issue](https://github.com/genentech/penrose-lamarck/issues) and submit a PR! We're looking forward to answering your questions on the issue thread.
 
 ## Applicants
 

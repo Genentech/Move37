@@ -34,8 +34,8 @@ echo "Extracting JetBrains Mono variable TTFs..."
 jb_normal_path="$(unzip -Z -1 "$tmpdir/jb.zip" | grep -E '^fonts/variable/JetBrainsMono.*\[wght\]\.ttf$' | head -n1 || true)"
 jb_italic_path="$(unzip -Z -1 "$tmpdir/jb.zip" | grep -E '^fonts/variable/JetBrainsMono-Italic.*\[wght\]\.ttf$' | head -n1 || true)"
 if [[ -z "$jb_normal_path" || -z "$jb_italic_path" ]]; then
-	echo "Failed to locate JetBrains Mono variable TTFs in release zip" >&2
-	exit 11
+    echo "Failed to locate JetBrains Mono variable TTFs in release zip" >&2
+    exit 11
 fi
 # Escape literal [ and ] for unzip's pattern matcher
 jb_normal_esc="${jb_normal_path//[/\\[}"
@@ -47,5 +47,5 @@ unzip -p "$tmpdir/jb.zip" "$jb_normal_esc" > "$FONT_DIR/JetBrainsMono-Variable.t
 unzip -p "$tmpdir/jb.zip" "$jb_italic_esc" > "$FONT_DIR/JetBrainsMono-Variable-Italic.ttf"
 
 echo "Done. Available font files:"
-ls -lh "$FONT_DIR" | sed 's/^/  /'
+find "$FONT_DIR" -lh | sed 's/^/  /'
 echo "Fonts downloaded to: $FONT_DIR"

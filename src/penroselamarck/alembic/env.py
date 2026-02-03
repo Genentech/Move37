@@ -1,12 +1,14 @@
 from __future__ import annotations
+
 import os
 from logging.config import fileConfig
-from sqlalchemy import pool
-from sqlalchemy.engine import Connection
-from sqlalchemy import create_engine
+
 from alembic import context
-from penroselamarck.models.base import Base
+from sqlalchemy import create_engine, pool
+from sqlalchemy.engine import Connection
+
 import penroselamarck.models  # noqa: F401 ensure model metadata is loaded
+from penroselamarck.models.base import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -16,6 +18,7 @@ config = context.config
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
 
 def _build_sync_db_url() -> str:
     """
@@ -35,9 +38,11 @@ def _build_sync_db_url() -> str:
     port = os.getenv("POSTGRES_PORT", "5432")
     return f"postgresql+psycopg://{user}:{password}@{host}:{port}/{db}"
 
+
 config.set_main_option("sqlalchemy.url", _build_sync_db_url())
 
 target_metadata = Base.metadata
+
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
@@ -52,13 +57,13 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
 
+
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(
-        connection=connection, target_metadata=target_metadata, compare_type=True
-    )
+    context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
 
     with context.begin_transaction():
         context.run_migrations()
+
 
 def run_migrations_online() -> None:
     connectable = create_engine(
@@ -69,6 +74,7 @@ def run_migrations_online() -> None:
     with connectable.connect() as connection:
         do_run_migrations(connection)
     connectable.dispose()
+
 
 if context.is_offline_mode():
     run_migrations_offline()
