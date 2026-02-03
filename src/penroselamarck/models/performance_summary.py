@@ -1,43 +1,62 @@
 """
-PerformanceSummary model.
+PerformanceSummary ORM model.
 
-Short summary describing the module's purpose.
-
-Optional longer description with context, constraints, and side effects.
+Stores aggregated statistics per exercise for quick lookup.
 
 Public API
 ----------
 - :class:`PerformanceSummary`: Aggregated stats for exercises.
+
+Attributes
+----------
+None
+
+Examples
+--------
+>>> from penroselamarck.models.performance_summary import PerformanceSummary
+>>> PerformanceSummary
+<class 'penroselamarck.models.performance_summary.PerformanceSummary'>
+
+See Also
+--------
+:class:`penroselamarck.models.exercise.Exercise`
 """
 
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel
+from typing import TYPE_CHECKING
+
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from penroselamarck.models.base import Base
+
+if TYPE_CHECKING:
+    from penroselamarck.models.exercise import Exercise
 
 
-class PerformanceSummary(BaseModel):
+class PerformanceSummary(Base):
     """
-    PerformanceSummary(exercise_id, total_attempts, pass_rate, last_practiced_at) -> PerformanceSummary
+    PerformanceSummary() -> PerformanceSummary
 
-    Concise (one-line) description of the function.
-
-    Parameters
-    ----------
-    exercise_id : str
-        Identifier of the exercise.
-    total_attempts : int
-        Total attempts recorded.
-    pass_rate : float
-        Ratio of passed attempts in [0, 1].
-    last_practiced_at : datetime
-        Timestamp of last practice.
+    ORM model capturing aggregated metrics per exercise.
 
     Returns
     -------
     PerformanceSummary
-        Aggregated performance statistics for an exercise.
+        SQLAlchemy-mapped performance summary record.
     """
-    exercise_id: str
-    total_attempts: int
-    pass_rate: float
-    last_practiced_at: Optional[datetime] = None
+
+    __tablename__ = "performance_summaries"
+
+    exercise_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("exercises.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    total_attempts: Mapped[int] = mapped_column(Integer, nullable=False)
+    pass_rate: Mapped[float] = mapped_column(Float, nullable=False)
+    last_practiced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    exercise: Mapped[Exercise] = relationship(back_populates="performance_summary")

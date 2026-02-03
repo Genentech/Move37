@@ -1,9 +1,7 @@
 """
-Exercise model.
+Exercise ORM model.
 
-Short summary describing the module's purpose.
-
-Optional longer description with context, constraints, and side effects.
+Defines the relational schema for exercises used in practice sessions.
 
 Public API
 ----------
@@ -16,52 +14,58 @@ None
 Examples
 --------
 >>> from penroselamarck.models.exercise import Exercise
->>> Exercise(question="hej", answer="hello", language="da")
-Exercise(question='hej', answer='hello', language='da', tags=None, id=None, content_hash=None, created_at=None)
+>>> Exercise
+<class 'penroselamarck.models.exercise.Exercise'>
 
 See Also
 --------
-:mod:`penroselamarck.mcp.server`
+:class:`penroselamarck.models.attempt.Attempt`
+:class:`penroselamarck.models.performance_summary.PerformanceSummary`
 """
 
+from __future__ import annotations
+
 from datetime import datetime
-from typing import List, Optional
-from pydantic import BaseModel
+from typing import TYPE_CHECKING
+
+from sqlalchemy import JSON, DateTime, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from penroselamarck.models.base import Base
+
+if TYPE_CHECKING:
+    from penroselamarck.models.attempt import Attempt
+    from penroselamarck.models.performance_summary import PerformanceSummary
 
 
-class Exercise(BaseModel):
+class Exercise(Base):
     """
-    Exercise(question, answer, language, tags=None, id=None) -> Exercise
-    
-    Concise (one-line) description of the function.
+    Exercise() -> Exercise
 
-    Extended description of the function, if necessary.
-
-    Parameters
-    ----------
-    question : str
-        The prompt shown to the learner.
-    answer : str
-        The expected correct answer.
-    language : str
-        ISO 639-1 code (e.g., 'da' for Danish).
-    tags : List[str], optional
-        Labels such as 'vocab', 'grammar'.
+    ORM model for a learning exercise.
 
     Returns
     -------
     Exercise
-        The exercise object with optional identifiers.
-
-    Examples
-    --------
-    >>> Exercise(question="hej", answer="hello", language="da")
-    Exercise(question='hej', answer='hello', language='da', tags=None, id=None, content_hash=None, created_at=None)
+        SQLAlchemy-mapped exercise record.
     """
-    question: str
-    answer: str
-    language: str
-    tags: Optional[List[str]] = None
-    id: Optional[str] = None
-    content_hash: Optional[str] = None
-    created_at: Optional[datetime] = None
+
+    __tablename__ = "exercises"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    language: Mapped[str] = mapped_column(String(8), nullable=False, index=True)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    attempts: Mapped[list[Attempt]] = relationship(
+        back_populates="exercise",
+        cascade="all, delete-orphan",
+    )
+    performance_summary: Mapped[PerformanceSummary | None] = relationship(
+        back_populates="exercise",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
