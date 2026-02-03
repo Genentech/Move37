@@ -16,7 +16,7 @@ name: penroselamarck
 ## rebuild and start all containers
 ##
 ##    docker compose down -v && docker compose up -d --build
-## 
+##
 ## project resources cleanup
 ##
 ##   docker compose down -v && docker network remove penroselamarck-network
@@ -59,21 +59,32 @@ services:
     environment:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/penrose
+      - DATABASE_URL=postgresql://penroselamarck:penroselamarck@db:5432/penroselamarck
     depends_on:
       - db
+    networks:
+      - penroselamarck
 
   db:
-    image: postgres:16-alpine
-    container_name: penroselamarck-pg
+    build:
+      context: .
+      dockerfile: src/penroselamarck/db/Dockerfile
+    container_name: penroselamarck-pg:1.0.0
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=penrose
+      - POSTGRES_USER=penroselamarck
+      - POSTGRES_PASSWORD=penroselamarck
+      - POSTGRES_DB=penroselamarck
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
       - penroselamarck-db-data:/var/lib/postgresql/data
+    networks:
+      - penroselamarck
 
 volumes:
   penroselamarck-db-data:
