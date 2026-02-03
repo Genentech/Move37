@@ -1,0 +1,17 @@
+web_search = "cached"
+model_reasoning_effort = "high"
+
+[shell_environment_policy]
+include_only = [
+  "PATH",
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "SSH_AUTH_SOCK",
+  "SSH_AGENT_PID",
+  "GIT_SSH_COMMAND",
+  "GIT_ASKPASS"
+]
+
+[features]
+shell_snapshot = true
