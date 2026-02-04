@@ -65,6 +65,20 @@ services:
     networks:
       - penroselamarck
 
+  ### pg database ##############################################################
+  ##
+  ## rebuild and start container
+  ##
+  ##    docker compose down -v db && docker compose up --build db
+  ##
+  ## NOTE applies migrations and seeds the relations deterministically
+  ##
+  ## debug
+  ##
+  ##    docker logs -f penroselamarck-pg
+  ##    docker exec -it penroselamarck-pg psql -U penroselamarck -d penroselamarck
+  ##    penroselamarck-# \dt
+  ##
   db:
     build:
       context: .
@@ -88,6 +102,9 @@ services:
     networks:
       - penroselamarck
 
+  ### lineage ##############################################################
+  ##
+  ##
   marquez-db:
     image: postgres:15-alpine
     container_name: penroselamarck-marquez-db
