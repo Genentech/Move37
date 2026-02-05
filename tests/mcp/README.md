@@ -4,7 +4,7 @@ This folder contains two ways to exercise the MCP server over HTTP/SSE.
 
 ## MCP Inspector (interactive)
 
-1. Ensure the MCP server is running at `http://penroselamarck-mcp:8080`.
+1. Ensure the MCP server is running at `http://penroselamarck-api:8080`.
 
 ### Container
 
@@ -51,7 +51,7 @@ pip install -r tests/python-requirements.txt
 2. Run the smoke test:
 
 ```bash
-python tests/mcp/fastmcp_client.py --sse-url http://penroselamarck-mcp:8080/v1/mcp/sse
+python tests/mcp/fastmcp_client.py --sse-url http://penroselamarck-api:8080/v1/mcp/sse
 ```
 
 The script lists tools and calls each MCP tool in a safe, ordered flow.

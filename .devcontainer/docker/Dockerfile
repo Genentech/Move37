@@ -58,7 +58,7 @@ COPY src/penroselamarck/alembic/python-requirements.txt /tmp/src/penroselamarck/
 COPY src/penroselamarck/api/python-requirements.txt /tmp/src/penroselamarck/api/python-requirements.txt
 COPY src/penroselamarck/core/python-requirements.txt /tmp/src/penroselamarck/core/python-requirements.txt
 COPY src/penroselamarck/db/python-requirements.txt /tmp/src/penroselamarck/db/python-requirements.txt
-COPY src/penroselamarck/mcp/python-requirements.txt /tmp/src/penroselamarck/mcp/python-requirements.txt
+COPY src/penroselamarck/api/python-requirements.txt /tmp/src/penroselamarck/api/python-requirements.txt
 COPY src/penroselamarck/models/python-requirements.txt /tmp/src/penroselamarck/models/python-requirements.txt
 COPY src/penroselamarck/repositories/python-requirements.txt /tmp/src/penroselamarck/repositories/python-requirements.txt
 COPY src/penroselamarck/schemas/python-requirements.txt /tmp/src/penroselamarck/schemas/python-requirements.txt

@@ -22,4 +22,4 @@ shell_snapshot = true
 trust_level = "trusted"
 
 [mcp_servers.penroselamarck]
-url = "http://penroselamarck-mcp:8080/v1/mcp/sse"
+url = "http://penroselamarck-api:8080/v1/mcp/sse"

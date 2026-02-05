@@ -11,7 +11,7 @@ huggingface-hub==0.35.3
 -r ../src/penroselamarck/api/python-requirements.txt
 -r ../src/penroselamarck/core/python-requirements.txt
 -r ../src/penroselamarck/db/python-requirements.txt
--r ../src/penroselamarck/mcp/python-requirements.txt
+-r ../src/penroselamarck/api/python-requirements.txt
 -r ../src/penroselamarck/models/python-requirements.txt
 -r ../src/penroselamarck/repositories/python-requirements.txt
 -r ../src/penroselamarck/schemas/python-requirements.txt

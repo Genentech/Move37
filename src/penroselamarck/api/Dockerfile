@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY src/penroselamarck/mcp/python-requirements.txt /app/requirements.txt
+COPY src/penroselamarck/api/python-requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Copy source tree from project root

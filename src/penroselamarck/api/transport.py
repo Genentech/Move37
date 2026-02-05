@@ -509,7 +509,7 @@ class McpHttpTransport:
             {
                 "protocolVersion": DEFAULT_PROTOCOL_VERSION,
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "penroselamarck-mcp", "version": mcp_version},
+                "serverInfo": {"name": "penroselamarck-api", "version": mcp_version},
             },
         )
 

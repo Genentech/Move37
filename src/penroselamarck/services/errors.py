@@ -23,7 +23,7 @@ True
 
 See Also
 --------
-:mod:`penroselamarck.mcp.routers.rest`
+:mod:`penroselamarck.api.routers.rest`
 """
 
 from __future__ import annotations
