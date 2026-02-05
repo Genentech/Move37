@@ -32,6 +32,11 @@ services:
   ##
   ##    docker compose --env-file .env down -v docs && docker compose --env-file .env up --build docs
   ##
+  ## expose ports
+  ##
+  ##    curl http://penroselamarck-docs:8000 (devcontainer)
+  ##    curl http://localhost:8000 (host)
+  ##
   ## ⚠️ ATTENTION ⚠️
   ##
   ##    you may want to run curl http://localhost:8000 from outside devcontainer
@@ -54,6 +59,18 @@ services:
     networks:
       - penroselamarck
 
+  ### mcp ##########################################################################
+  ##
+  ## rebuild and start container
+  ##
+  ##    docker compose down -v mcp && docker compose up --build mcp
+  ##
+  ## debug
+  ##
+  ##    docker logs -f penroselamarck-mcp
+  ##    curl -s http://penroselamarck-mcp:8080/v1/auth/me | jq
+  ##    curl -s http://penroselamarck-mcp:8080/health | jq
+  ##    curl -N -H 'Accept: text/event-stream' http://penroselamarck-mcp:8080/v1/mcp/sse
   mcp:
     build:
       context: .
