@@ -9,7 +9,7 @@ This folder contains two ways to exercise the MCP server over HTTP/SSE.
 
 ```bash
 npx @modelcontextprotocol/inspector \
-    --config tests/mcp/mcp_inspector.json \
+    --config tests/mcp/config.json \
     --server penroselamarck
 ```
 
@@ -26,7 +26,7 @@ pip install -r tests/python-requirements.txt
 2. Run the smoke test:
 
 ```bash
-python tests/mcp/mcp_fastmcp_client.py --sse-url http://penroselamarck-mcp:8080/v1/mcp/sse
+python tests/mcp/fastmcp_client.py --sse-url http://penroselamarck-mcp:8080/v1/mcp/sse
 ```
 
 The script lists tools and calls each MCP tool in a safe, ordered flow.
