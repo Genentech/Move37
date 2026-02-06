@@ -2,6 +2,19 @@
 
 Live documentation: https://genentech.github.io/penrose-lamarck/
 
+## Getting Started
+
+```sh
+ ❯ codex mcp list
+ Name            Url                                        Bearer Token Env Var  Status   Auth
+ penroselamarck  http://penroselamarck-api:8080/v1/mcp/sse  -                     enabled  OAuth
+
+ ❯ codex mcp login penroselamarck
+ Successfully logged in to MCP server 'penroselamarck'.
+
+ ❯ codex
+```
+
 ## Contributing
 
 [Fork](https://github.com/genentech/penrose-lamarck/fork) the project, pick an [issue](https://github.com/genentech/penrose-lamarck/issues) and submit a PR! We're looking forward to answering your questions on the issue thread.

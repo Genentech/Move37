@@ -26,17 +26,18 @@ See Also
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from penroselamarck.api.dependencies import get_current_user
 from penroselamarck.api.routers.rest import auth, context, exercise, metrics, practice, train
 
 router = APIRouter()
 router.include_router(auth.router)
-router.include_router(context.router)
-router.include_router(exercise.router)
-router.include_router(train.router)
-router.include_router(practice.router)
-router.include_router(metrics.router)
+router.include_router(context.router, dependencies=[Depends(get_current_user)])
+router.include_router(exercise.router, dependencies=[Depends(get_current_user)])
+router.include_router(train.router, dependencies=[Depends(get_current_user)])
+router.include_router(practice.router, dependencies=[Depends(get_current_user)])
+router.include_router(metrics.router, dependencies=[Depends(get_current_user)])
 
 
 def build_rest_router() -> APIRouter:

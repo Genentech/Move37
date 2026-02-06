@@ -29,8 +29,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from penroselamarck.api.dependencies import get_service_container
+from penroselamarck.api.dependencies import get_current_user, get_service_container
 from penroselamarck.api.schemas import LoginInput, LoginOutput
+from penroselamarck.repositories.user_repository import UserRecord
 from penroselamarck.services.container import ServiceContainer
 from penroselamarck.services.errors import ServiceError
 
@@ -71,22 +72,21 @@ def auth_login(
 
 @router.get("/auth/me", response_model=LoginOutput)
 def auth_me(
-    services: Annotated[ServiceContainer, Depends(get_service_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
 ) -> LoginOutput:
     """
-    auth_me(services) -> LoginOutput
+    auth_me(current_user) -> LoginOutput
 
     Concise (one-line) description of the function.
 
     Parameters
     ----------
-    services : ServiceContainer
-        Service container dependency.
+    current_user : UserRecord
+        Authenticated user record.
 
     Returns
     -------
     LoginOutput
         The current user context (demo user).
     """
-    user = services.auth_service.demo_user()
-    return LoginOutput(userId=user.user_id, roles=user.roles)
+    return LoginOutput(userId=current_user.user_id, roles=current_user.roles)

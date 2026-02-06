@@ -151,6 +151,8 @@ class McpHttpTransport:
         Create an SSE stream for MCP messages.
     handle_post(session_id, payload)
         Handle incoming MCP JSON-RPC messages.
+    handle_request(payload)
+        Handle a single JSON-RPC request and return the response.
     """
 
     def __init__(self, tool_registry: McpToolRegistry) -> None:
@@ -222,6 +224,29 @@ class McpHttpTransport:
         if response is None:
             return
         await queue.put(response)
+
+    def handle_request(self, payload: dict) -> dict | None:
+        """
+        handle_request(payload) -> Optional[Dict]
+
+        Concise (one-line) description of the function.
+
+        Parameters
+        ----------
+        payload : Dict
+            JSON-RPC request payload.
+
+        Returns
+        -------
+        Optional[Dict]
+            JSON-RPC response payload or None for notifications.
+
+        Examples
+        --------
+        >>> isinstance(McpHttpTransport.__name__, str)
+        True
+        """
+        return self._handle_json_rpc(payload)
 
     async def _event_stream(self, session_id: str, endpoint_url: str):
         """

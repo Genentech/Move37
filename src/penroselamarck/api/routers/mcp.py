@@ -28,141 +28,24 @@ from __future__ import annotations
 from json import JSONDecodeError
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 
-from penroselamarck.api.dependencies import get_mcp_transport, get_service_container
+from penroselamarck.api.dependencies import get_current_user, get_mcp_transport
 from penroselamarck.api.transport import McpHttpTransport
-from penroselamarck.services.container import ServiceContainer
-from penroselamarck.services.errors import ServiceError
+from penroselamarck.repositories.user_repository import UserRecord
 
 router = APIRouter()
-
-
-def _resource_metadata_url(request: Request) -> str:
-    """
-    _resource_metadata_url(request) -> str
-
-    Concise (one-line) description of the function.
-
-    Parameters
-    ----------
-    request : Request
-        FastAPI request context.
-
-    Returns
-    -------
-    str
-        Resource metadata URL for OAuth discovery.
-
-    Examples
-    --------
-    >>> isinstance(_resource_metadata_url.__name__, str)
-    True
-    """
-    return f"{str(request.base_url).rstrip('/')}/.well-known/oauth-protected-resource"
-
-
-def _www_authenticate_header(request: Request, description: str) -> str:
-    """
-    _www_authenticate_header(request, description) -> str
-
-    Concise (one-line) description of the function.
-
-    Parameters
-    ----------
-    request : Request
-        FastAPI request context.
-    description : str
-        Error description for the header.
-
-    Returns
-    -------
-    str
-        WWW-Authenticate header value.
-
-    Examples
-    --------
-    >>> isinstance(_www_authenticate_header.__name__, str)
-    True
-    """
-    safe_description = description.replace('"', "'")
-    resource_metadata = _resource_metadata_url(request)
-    return (
-        'Bearer realm="mcp", error="invalid_token", '
-        f'error_description="{safe_description}", '
-        f'resource_metadata="{resource_metadata}"'
-    )
-
-
-def _require_bearer_token(
-    request: Request,
-    services: ServiceContainer,
-) -> None:
-    """
-    _require_bearer_token(request, services) -> None
-
-    Concise (one-line) description of the function.
-
-    Parameters
-    ----------
-    request : Request
-        FastAPI request context.
-    services : ServiceContainer
-        Service container dependency.
-
-    Throws
-    ------
-    HTTPException
-        Raised when authentication fails.
-
-    Returns
-    -------
-    None
-        Validates the bearer token or raises an HTTP exception.
-
-    Examples
-    --------
-    >>> callable(_require_bearer_token)
-    True
-    """
-    authorization = request.headers.get("authorization")
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing bearer token.",
-            headers={
-                "WWW-Authenticate": _www_authenticate_header(request, "Missing bearer token.")
-            },
-        )
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header.",
-            headers={
-                "WWW-Authenticate": _www_authenticate_header(
-                    request, "Invalid authorization header."
-                )
-            },
-        )
-    try:
-        services.auth_service.login(token)
-    except ServiceError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=exc.message,
-            headers={"WWW-Authenticate": _www_authenticate_header(request, exc.message)},
-        ) from exc
 
 
 @router.get("/mcp/sse")
 async def mcp_sse(
     request: Request,
     transport: Annotated[McpHttpTransport, Depends(get_mcp_transport)],
-    services: Annotated[ServiceContainer, Depends(get_service_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
 ):
     """
-    mcp_sse(request, transport) -> StreamingResponse
+    mcp_sse(request, transport, current_user) -> StreamingResponse
 
     Concise (one-line) description of the function.
 
@@ -172,15 +55,15 @@ async def mcp_sse(
         FastAPI request context.
     transport : McpHttpTransport
         MCP transport dependency.
-    services : ServiceContainer
-        Service container dependency.
+    current_user : UserRecord
+        Authenticated user record.
 
     Returns
     -------
     StreamingResponse
         SSE stream for MCP messages.
     """
-    _require_bearer_token(request, services)
+    _ = current_user
     if not request.url.path.endswith("/mcp/sse"):
         raise HTTPException(status_code=400, detail="Invalid SSE path")
     endpoint_base = request.url.path[: -len("/sse")]
@@ -193,10 +76,10 @@ async def mcp_messages(
     request: Request,
     session_id: str,
     transport: Annotated[McpHttpTransport, Depends(get_mcp_transport)],
-    services: Annotated[ServiceContainer, Depends(get_service_container)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
 ) -> dict:
     """
-    mcp_messages(request, session_id, transport) -> Dict
+    mcp_messages(request, session_id, transport, current_user) -> Dict
 
     Concise (one-line) description of the function.
 
@@ -208,18 +91,59 @@ async def mcp_messages(
         MCP session identifier.
     transport : McpHttpTransport
         MCP transport dependency.
-    services : ServiceContainer
-        Service container dependency.
+    current_user : UserRecord
+        Authenticated user record.
 
     Returns
     -------
     Dict
         Acknowledgement response.
     """
-    _require_bearer_token(request, services)
+    _ = current_user
     try:
         payload = await request.json()
     except JSONDecodeError as exc:
         raise HTTPException(status_code=400, detail="Invalid JSON payload") from exc
     await transport.handle_post(session_id, payload)
     return {"status": "accepted"}
+
+
+@router.post("/mcp/sse")
+async def mcp_streamable_http(
+    request: Request,
+    transport: Annotated[McpHttpTransport, Depends(get_mcp_transport)],
+    current_user: Annotated[UserRecord, Depends(get_current_user)],
+) -> JSONResponse:
+    """
+    mcp_streamable_http(request, transport, current_user) -> JSONResponse
+
+    Concise (one-line) description of the function.
+
+    Parameters
+    ----------
+    request : Request
+        FastAPI request context.
+    transport : McpHttpTransport
+        MCP transport dependency.
+    current_user : UserRecord
+        Authenticated user record.
+
+    Returns
+    -------
+    JSONResponse
+        JSON-RPC response payload for streamable HTTP clients.
+
+    Examples
+    --------
+    >>> callable(mcp_streamable_http)
+    True
+    """
+    _ = current_user
+    try:
+        payload = await request.json()
+    except JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload") from exc
+    response = transport.handle_request(payload)
+    if response is None:
+        return JSONResponse(status_code=202, content={"status": "accepted"})
+    return JSONResponse(content=response)
