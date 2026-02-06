@@ -67,11 +67,16 @@ the protected resource metadata endpoint. The flow used is **Authorization Code 
 
 1. Auth0 Dashboard: create an **API** and set its **Identifier** to your audience
    (e.g. ``https://penroselamarck/``).
+   - Auth0 Dashboard: set **Default Audience** under **Tenant Settings → API Authorization
+     Settings** to exactly ``https://penroselamarck/`` to ensure DCR clients receive JWT access
+     tokens for this API.
 2. Auth0 Dashboard: enable **Dynamic Client Registration (DCR)** and
    **Enable Application Connections**.
    - Navigation: ``Settings → Advanced``.
-3. Ensure at least one connection exists (Database or Social).
-4. Promote that connection to **domain level**. DCR creates **third‑party** clients that cannot
+3. Auth0 Dashboard: for the API **Application Access Policy**, set **User Access** to
+   **Allow** and **Client Access** to **Deny**.
+4. Ensure at least one connection exists (Database or Social).
+5. Promote that connection to **domain level**. DCR creates **third‑party** clients that cannot
    be enabled per‑app, so domain‑level promotion is required for DCR logins to work.
    - You **must** obtain a Management API token using
      ``Applications → APIs → Auth0 Management API → API Explorer``.
@@ -93,16 +98,17 @@ the protected resource metadata endpoint. The flow used is **Authorization Code 
      -H "Content-Type: application/json" \
      -d '{"is_domain_connection": true}'
 
-5. Configure MCP (``.env``) and restart the container:
+6. Configure MCP (``.env``) and restart the container:
 
 .. code-block:: bash
 
    AUTH0_DOMAIN=YOUR_TENANT.us.auth0.com
    AUTH0_AUDIENCE=https://penroselamarck/
-   MCP_RESOURCE_URLS=http://localhost:8080,http://penroselamarck-mcp:8080
 
-6. Configure Codex CLI and login:
+7. Configure Codex CLI and login:
    - Set ``mcp_oauth_callback_port = 1455`` in ``~/.codex/config.toml``.
+   - Set ``mcp_oauth_credentials_store = "file"`` if you want MCP OAuth tokens stored in a
+     file instead of the OS keyring.
    - The callback URL is **not** the MCP server. It is the local loopback URL Codex listens on.
      Ensure the Auth0 application callback URL includes ``http://localhost:1455/auth/callback``.
    - Run:
@@ -111,8 +117,8 @@ the protected resource metadata endpoint. The flow used is **Authorization Code 
 
    codex mcp login penroselamarck
 
-7. Validate OAuth metadata (optional):
+8. Validate OAuth metadata (optional):
 
 .. code-block:: bash
 
-   curl -s http://localhost:8080/.well-known/oauth-protected-resource | jq
+   curl -s http://penroselamarck-api:8080/.well-known/oauth-protected-resource | jq
