@@ -173,7 +173,7 @@ services:
   ## debug
   ##
   ##    docker logs -f penroselamarck-pg
-  ##    docker exec -it penroselamarck-pg psql -U penroselamarck -d penroselamarck
+  ##    docker exec -it penroselamarck-pg psql -U penroselamarck -d penroselamarck -c "select * from exercises;"
   ##    penroselamarck-# \dt
   ##
   db:
