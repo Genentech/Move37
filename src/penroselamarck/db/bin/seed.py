@@ -123,6 +123,16 @@ def _stable_id(seed: int, name: str) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _resource_uri(kind: str, stable_key: str) -> str:
+    """
+    _resource_uri(kind, stable_key) -> str
+
+    Build stable Penrose-Lamarck resource URIs.
+    """
+    short = stable_key[:16]
+    return f"pluid:{kind}:{short}"
+
+
 def _content_hash(question: str, answer: str) -> str:
     """
     _content_hash(question, answer) -> str
@@ -174,46 +184,88 @@ def _exercise_rows(seed: int) -> list[dict]:
     """
     base = [
         {
-            "question": "hej",
-            "answer": "hello",
+            "question": "Patient intake greeting in Danish",
+            "answer": "Hej, hvordan har du det i dag?",
             "language": "da",
-            "tags": ["vocab"],
-            "classes": ["vocabulary"],
+            "tags": ["medical", "intro"],
+            "classes": ["conversation", "triage"],
         },
         {
-            "question": "tak",
-            "answer": "thanks",
+            "question": "Record blood pressure values in Spanish",
+            "answer": "Presion arterial ciento veinte sobre ochenta",
+            "language": "es",
+            "tags": ["vitals", "cardiology"],
+            "classes": ["vocabulary", "cardiology"],
+        },
+        {
+            "question": "Explain fasting requirement before blood test",
+            "answer": "Do not eat for eight hours before the test",
+            "language": "en",
+            "tags": ["lab"],
+            "classes": ["conversation", "lab"],
+        },
+        {
+            "question": "Triage chest pain urgency phrasing",
+            "answer": "Chest pain with shortness of breath requires immediate assessment",
+            "language": "en",
+            "tags": ["triage", "urgent"],
+            "classes": ["triage", "cardiology"],
+        },
+        {
+            "question": "Medication reconciliation script",
+            "answer": "Please list all medicines and doses you take daily",
+            "language": "en",
+            "tags": ["pharmacy"],
+            "classes": ["conversation", "medication"],
+        },
+        {
+            "question": "Post-op wound care vocabulary in Swedish",
+            "answer": "Byt forband och hall saaret rent",
+            "language": "sv",
+            "tags": ["surgery", "care"],
+            "classes": ["vocabulary", "postop"],
+        },
+        {
+            "question": "Lab specimen confirmation checklist",
+            "answer": "Confirm patient name, date of birth, and specimen label match",
+            "language": "en",
+            "tags": ["lab", "safety"],
+            "classes": ["lab", "safety"],
+        },
+        {
+            "question": "Emergency allergy escalation sentence",
+            "answer": "Severe allergy signs require immediate physician notification",
+            "language": "en",
+            "tags": ["urgent", "allergy"],
+            "classes": ["triage", "safety"],
+        },
+        {
+            "question": "Cardiology follow-up appointment phrase in Danish",
+            "answer": "Naeste kontrol hos hjertelaegen er om to uger",
             "language": "da",
-            "tags": ["vocab"],
-            "classes": ["vocabulary"],
+            "tags": ["appointment", "cardiology"],
+            "classes": ["conversation", "cardiology"],
         },
         {
-            "question": "farvel",
-            "answer": "goodbye",
-            "language": "da",
-            "tags": ["vocab"],
-            "classes": ["vocabulary"],
+            "question": "Antibiotic dosage confirmation",
+            "answer": "Take one tablet twice daily after meals",
+            "language": "en",
+            "tags": ["medication"],
+            "classes": ["medication", "vocabulary"],
         },
         {
-            "question": "hej då",
-            "answer": "goodbye",
-            "language": "sv",
-            "tags": ["vocab"],
-            "classes": ["vocabulary"],
+            "question": "Discharge safety warning",
+            "answer": "Return to emergency if fever or breathing difficulty occurs",
+            "language": "en",
+            "tags": ["discharge", "safety"],
+            "classes": ["safety", "conversation"],
         },
         {
-            "question": "tack",
-            "answer": "thanks",
-            "language": "sv",
-            "tags": ["vocab"],
-            "classes": ["vocabulary"],
-        },
-        {
-            "question": "varsågod",
-            "answer": "you're welcome",
-            "language": "sv",
-            "tags": ["phrase"],
-            "classes": ["phrase"],
+            "question": "Post-op pain scale translation",
+            "answer": "Rate your pain from zero to ten",
+            "language": "en",
+            "tags": ["postop", "assessment"],
+            "classes": ["postop", "triage"],
         },
     ]
     rng = random.Random(seed)
@@ -224,6 +276,7 @@ def _exercise_rows(seed: int) -> list[dict]:
         row_id = _stable_id(seed, f"exercise-{idx}")
         rows.append({
             "id": row_id,
+            "uri": _resource_uri("exercise", row_id),
             "question": row["question"],
             "answer": row["answer"],
             "language": row["language"],
@@ -258,11 +311,13 @@ def _session_rows(seed: int, exercise_ids: list[str]) -> list[dict]:
     >>> isinstance(_session_rows(1, [\"e\"]), list)
     True
     """
-    first_group = exercise_ids[:3]
-    second_group = exercise_ids[3:]
+    first_group = exercise_ids[:4]
+    second_group = exercise_ids[4:8]
+    third_group = exercise_ids[8:]
     return [
         {
             "session_id": _stable_id(seed, "session-1"),
+            "uri": _resource_uri("practice-session", _stable_id(seed, "session-1")),
             "language": "da",
             "strategy": "mixed",
             "target_count": len(first_group),
@@ -273,6 +328,7 @@ def _session_rows(seed: int, exercise_ids: list[str]) -> list[dict]:
         },
         {
             "session_id": _stable_id(seed, "session-2"),
+            "uri": _resource_uri("practice-session", _stable_id(seed, "session-2")),
             "language": "sv",
             "strategy": "spaced",
             "target_count": len(second_group),
@@ -280,6 +336,17 @@ def _session_rows(seed: int, exercise_ids: list[str]) -> list[dict]:
             "started_at": datetime(2024, 1, 3, 10, 0, 0),
             "ended_at": datetime(2024, 1, 3, 10, 20, 0),
             "selected_exercise_ids": second_group,
+        },
+        {
+            "session_id": _stable_id(seed, "session-3"),
+            "uri": _resource_uri("practice-session", _stable_id(seed, "session-3")),
+            "language": "en",
+            "strategy": "weakest",
+            "target_count": len(third_group),
+            "status": "ended",
+            "started_at": datetime(2024, 1, 4, 14, 0, 0),
+            "ended_at": datetime(2024, 1, 4, 14, 25, 0),
+            "selected_exercise_ids": third_group,
         },
     ]
 
@@ -312,13 +379,15 @@ def _attempt_rows(seed: int, sessions: list[dict]) -> list[dict]:
     for sess_index, sess in enumerate(sessions, start=1):
         for ex_index, ex_id in enumerate(sess["selected_exercise_ids"], start=1):
             attempt_id = _stable_id(seed, f"attempt-{sess_index}-{ex_index}")
+            score = 1.0 if ex_index % 3 == 1 else (0.75 if ex_index % 3 == 2 else 0.45)
             attempts.append({
                 "id": attempt_id,
+                "uri": _resource_uri("attempt", attempt_id),
                 "session_id": sess["session_id"],
                 "exercise_id": ex_id,
-                "user_answer": "ok",
-                "score": 1.0 if ex_index % 2 == 1 else 0.6,
-                "passed": ex_index % 2 == 1,
+                "user_answer": f"candidate-answer-{sess_index}-{ex_index}",
+                "score": score,
+                "passed": score >= 0.7,
                 "evaluated_at": sess["started_at"] + timedelta(minutes=ex_index * 3),
             })
     return attempts
@@ -362,6 +431,7 @@ def _summary_rows(attempts: Iterable[dict]) -> list[dict]:
         total = stats["total"]
         rows.append({
             "exercise_id": exercise_id,
+            "uri": _resource_uri("performance-summary", exercise_id),
             "total_attempts": total,
             "pass_rate": (stats["passed"] / total) if total else 0.0,
             "last_practiced_at": stats["last"],

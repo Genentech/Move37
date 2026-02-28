@@ -61,48 +61,71 @@ services:
 
   ### api ##########################################################################
   ##
-  ## rebuild and start container
+  ## quick start (host-side Codex CLI compatible; uses localhost)
   ##
-  ##    docker compose down -v api && docker compose up --build api
+  ##    docker compose down -v api && MCP_AUTH_DISABLED=true docker compose up -d --build db api
   ##
-  ## debug
+  ## rebuild only API (keep db volume/data)
   ##
-  ##    docker logs -f penroselamarck-api
-  ##    curl -s http://penroselamarck-api:8080/v1/auth/me | jq
-  ##    curl -s http://penroselamarck-api:8080/health | jq
-  ##    curl -N -H 'Accept: text/event-stream' http://penroselamarck-api:8080/v1/mcp/sse
+  ##    docker compose up -d --build api
   ##
-  ##    curl -N -H 'Accept: text/event-stream' http://localhost:8080/v1/mcp/sse
+  ## logs
   ##
+  ##    docker compose logs -f api
+  ##
+  ## health and metadata
+  ##   host:
+  ##     curl -s http://localhost:8080/health | jq
+  ##     curl -s http://localhost:8080/.well-known/oauth-protected-resource | jq
+  ##
+  ##   devcontainer:
+  ##     curl -s http://penroselamarck-api:8080/health | jq
+  ##     curl -s http://penroselamarck-api:8080/.well-known/oauth-protected-resource | jq
+  ##
+  ## MCP SSE handshake (returns initial endpoint event and keeps stream open)
+  ##   host:
+  ##     curl -N -H 'Accept: text/event-stream' http://localhost:8080/v1/mcp/sse
+  ##
+  ##   devcontainer:
+  ##     curl -N -H 'Accept: text/event-stream' http://penroselamarck-api:8080/v1/mcp/sse
+  ##
+  ## manual MCP JSON-RPC call (use session_id from SSE endpoint event)
   ##    export SESSION_ID=981ba8457164413296f9a2e49a3f78b6
-  ##    export MCP_ENDPOINT="http://penroselamarck-api:8080/v1/mcp/messages?session_id=$SESSION_ID"
   ##
-  ##    curl -s http://penroselamarck-api:8080/.well-known/oauth-protected-resource | jq
+  ##    export MCP_ENDPOINT="http://localhost:8080/v1/mcp/messages?session_id=${SESSION_ID}" # host
+  ##    export MCP_ENDPOINT="http://penroselamarck-api:8080/v1/mcp/messages?session_id=${SESSION_ID}"  # devcontainer
   ##
   ##    (see SSE for logs)
   ##    curl -s -X POST "$MCP_ENDPOINT" \
-  ##        -H 'Content-Type: application/json' \
-  ##        -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+  ##      -H 'Content-Type: application/json' \
+  ##      -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
   ##
   ##    curl -s -X POST "$MCP_ENDPOINT" \
-  ##        -H 'Content-Type: application/json' \
-  ##        -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":""auth.login","arguments":{"token":"dev"}}}'
+  ##      -H 'Content-Type: application/json' \
+  ##      -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"auth.login","arguments":{"token":"dev"}}}'
   ##
   ## test GITHUB_TOKEN for API calls
   ##
   ##    docker compose exec api sh -lc '[ -n "$GITHUB_TOKEN" ] && [ -n "$GITHUB_REPOSITORY" ] && echo ok || echo missing'
-
+  ##
   api:
     build:
       context: .
       dockerfile: ./src/penroselamarck/api/Dockerfile
     container_name: penroselamarck-api
     image: ghcr.io/genentech/penrose-lamarck-api:1.0.0
+    env_file:
+      - path: ./src/penroselamarck/api/.env
+        required: false
     ports:
       - "8080:8080"
     environment:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
+      - API_TITLE=${API_TITLE:-Penrose-Lamarck MCP (HTTP bridge)}
+      - API_VERSION=${API_VERSION:-}
+      - MCP_SERVER_NAME=${MCP_SERVER_NAME:-penroselamarck-api}
+      - MCP_SERVER_VERSION=${MCP_SERVER_VERSION:-}
       - DATABASE_URL=postgresql://penroselamarck:penroselamarck@db:5432/penroselamarck
       - AUTH0_DOMAIN=${AUTH0_DOMAIN:-}
       - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-}
@@ -149,8 +172,10 @@ services:
   ##
   web:
     build:
-      context: ./src/penroselamarck/web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./src/penroselamarck/web/Dockerfile
+      args:
+        WEB_SDK_SOURCE: local
     container_name: penroselamarck-web
     image: ghcr.io/genentech/penrose-lamarck-web:1.0.0
     ports:
@@ -434,7 +459,8 @@ services:
   ##
   ##    docker compose down -v db && docker compose up --build db
   ##
-  ## NOTE applies migrations only; data starts empty by default
+  ## NOTE applies migrations on startup.
+  ## Set DB_MOCK_DATA=true to run deterministic seed data at startup.
   ##
   ## debug
   ##
@@ -456,6 +482,7 @@ services:
       - POSTGRES_USER=penroselamarck
       - POSTGRES_PASSWORD=penroselamarck
       - POSTGRES_DB=penroselamarck
+      - DB_MOCK_DATA=${DB_MOCK_DATA:-false}
       - OPENLINEAGE_URL=http://marquez:5000
       - OPENLINEAGE_NAMESPACE=penroselamarck
     ports:

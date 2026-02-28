@@ -1,0 +1,107 @@
+name: Deploy OIDC Bootstrap
+
+# Bootstrap note:
+# This workflow assumes AWS credentials via GitHub OIDC (aws-actions/configure-aws-credentials).
+# Therefore, the first deployment of the OIDC provider + deploy role must be done manually
+# (or from a trusted non-OIDC pipeline). Until that bootstrap exists, this workflow cannot authenticate.
+#
+# Manual bootstrap command:
+# npm run deploy:oidc-bootstrap
+#
+on:
+  # Automatic deployment trigger on infra stack tags.
+  # GitHub tag filters use glob syntax; exact format is validated in the metadata step.
+  # Supported tags:
+  # - cdk-stack-oidc-1.2.3-b.1            -> Development
+  # - cdk-stack-oidc-1.2.3-a.1            -> Beta
+  # - cdk-stack-oidc-1.2.3-rc.1           -> Release Candidate
+  # - cdk-stack-oidc-1.2.3                -> Production
+  push:
+    tags:
+      - 'cdk-stack-oidc-*'
+    paths:
+      - 'src/penroselamarck/infra/eks/**'
+      - '.github/workflows/deploy-oidc-bootstrap.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-oidc-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: src/penroselamarck/infra/eks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Resolve stack metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION_SUFFIX=""
+
+          if [[ "$TAG" =~ ^cdk-stack-oidc-([0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+(\.[0-9]+)?)?)$ ]]; then
+            VERSION_SUFFIX="${BASH_REMATCH[1]}"
+          else
+            echo "Unsupported tag format: $TAG" >&2
+            exit 1
+          fi
+
+          if [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+-b\.[0-9]+$ ]]; then
+            DEPLOY_ENV="dev"
+          elif [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+-a\.[0-9]+$ ]]; then
+            DEPLOY_ENV="beta"
+          elif [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
+            DEPLOY_ENV="rc"
+          elif [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            DEPLOY_ENV="prod"
+          else
+            echo "Unsupported version suffix in tag: $TAG" >&2
+            exit 1
+          fi
+
+          echo "stack_version=$VERSION_SUFFIX" >> "$GITHUB_OUTPUT"
+          echo "deploy_env=$DEPLOY_ENV" >> "$GITHUB_OUTPUT"
+
+      - name: Apply stack version from tag
+        run: |
+          set -euo pipefail
+          if grep -qE '^oidc:' stack-version.yaml; then
+            sed -E -i "s/^oidc:.*/oidc: ${{ steps.meta.outputs.stack_version }}/" stack-version.yaml
+          else
+            echo "oidc: ${{ steps.meta.outputs.stack_version }}" >> stack-version.yaml
+          fi
+          echo "Using stack-version.yaml:"
+          cat stack-version.yaml
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'eu-central-1' }}
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Deploy OIDC bootstrap stack
+        env:
+          PENROSELAMARCK_DEPLOY_ENV: ${{ steps.meta.outputs.deploy_env }}
+        run: |
+          set -euo pipefail
+          npm run deploy:oidc-bootstrap

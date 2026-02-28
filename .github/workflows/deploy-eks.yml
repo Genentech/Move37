@@ -1,0 +1,234 @@
+name: Deploy EKS
+
+on:
+  # Automatic deployment trigger on release and infra stack tags.
+  # GitHub tag filters use glob syntax; exact format is validated in the metadata step.
+  # Supported tags:
+  # - cdk-stack-eks-1.2.3-b.1             -> Development
+  # - cdk-stack-eks-1.2.3-a.1             -> Beta               [FORBIDDEN:Minerva]
+  # - cdk-stack-eks-1.2.3-rc.1            -> Release Candidate  [FORBIDDEN:Minerva]
+  # - cdk-stack-eks-1.2.3                 -> Production         [FORBIDDEN:Minerva]
+  push:
+    tags:
+      - 'cdk-stack-eks-*'
+    paths:
+      - 'src/penroselamarck/infra/eks/**'
+      - 'src/penroselamarck/api/**'
+      - 'src/penroselamarck/db/**'
+      - 'src/penroselamarck/web/**'
+      - 'src/penroselamarck/alembic.ini'
+      - 'src/penroselamarck/alembic/**'
+      - 'src/penroselamarck/core/**'
+      - 'src/penroselamarck/models/**'
+      - 'src/penroselamarck/schemas/**'
+      - 'src/penroselamarck/repositories/**'
+      - 'src/penroselamarck/services/**'
+      - 'src/penroselamarck/__init__.py'
+      - 'docs/**'
+      - '.github/workflows/deploy-eks.yml'
+  workflow_run:
+    workflows:
+      - Deploy Web Container
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-eks-${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      VPC_ID: ${{ vars.VPC_ID }}
+      WEB_STANDALONE_DEBUG: ${{ vars.WEB_STANDALONE_DEBUG || 'false' }}
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: src/penroselamarck/infra/eks
+
+    steps:
+      - name: Checkout (Push Trigger)
+        if: github.event_name == 'push'
+        uses: actions/checkout@v4
+
+      - name: Checkout (Web Rollout Trigger)
+        if: github.event_name == 'workflow_run'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Download web release metadata artifact
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-web-metadata
+          path: src/penroselamarck/infra/eks
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Resolve release metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          VERSION_SUFFIX=""
+          TAG_KIND=""
+          IMAGE_TAG=""
+          DEPLOY_ENV=""
+          CLUSTER_NAME=""
+          NAMESPACE=""
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_run" ]]; then
+            test -f deploy-web-metadata.json || { echo "deploy-web-metadata.json not found" >&2; exit 1; }
+
+            IMAGE_TAG="$(jq -r '.image_tag' deploy-web-metadata.json)"
+            TARGET_BRANCH="$(jq -r '.target_branch' deploy-web-metadata.json)"
+
+            [[ -n "$IMAGE_TAG" && "$IMAGE_TAG" != "null" ]] || { echo "Missing image_tag in metadata" >&2; exit 1; }
+            [[ -n "$TARGET_BRANCH" && "$TARGET_BRANCH" != "null" ]] || { echo "Missing target_branch in metadata" >&2; exit 1; }
+
+            TAG_KIND="web-rollout"
+
+            case "$TARGET_BRANCH" in
+              dev)
+                DEPLOY_ENV="dev"
+                CLUSTER_NAME="penroselamarck-eks-dev"
+                NAMESPACE="penroselamarck-dev"
+                ;;
+              beta)
+                DEPLOY_ENV="beta"
+                CLUSTER_NAME="penroselamarck-eks-beta"
+                NAMESPACE="penroselamarck-beta"
+                ;;
+              rc)
+                DEPLOY_ENV="rc"
+                CLUSTER_NAME="penroselamarck-eks-rc"
+                NAMESPACE="penroselamarck-rc"
+                ;;
+              latest)
+                DEPLOY_ENV="prod"
+                CLUSTER_NAME="penroselamarck-eks-prod"
+                NAMESPACE="penroselamarck-prod"
+                ;;
+              *)
+                echo "Unsupported target_branch in metadata: $TARGET_BRANCH" >&2
+                exit 1
+                ;;
+            esac
+          else
+            TAG="${GITHUB_REF_NAME}"
+            if [[ "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+(\.[0-9]+)?)?)$ ]]; then
+              TAG_KIND="release"
+              VERSION_SUFFIX="${BASH_REMATCH[1]}"
+              IMAGE_TAG="${VERSION_SUFFIX}"
+            elif [[ "$TAG" =~ ^cdk-stack-eks-([0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+(\.[0-9]+)?)?)$ ]]; then
+              TAG_KIND="infra"
+              VERSION_SUFFIX="${BASH_REMATCH[1]}"
+            else
+              echo "Unsupported tag format: $TAG" >&2
+              exit 1
+            fi
+
+            if [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+-b\.[0-9]+$ ]]; then
+              DEPLOY_ENV="dev"
+              CLUSTER_NAME="penroselamarck-eks-dev"
+              NAMESPACE="penroselamarck-dev"
+            elif [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+-a\.[0-9]+$ ]]; then
+              DEPLOY_ENV="beta"
+              CLUSTER_NAME="penroselamarck-eks-beta"
+              NAMESPACE="penroselamarck-beta"
+            elif [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
+              DEPLOY_ENV="rc"
+              CLUSTER_NAME="penroselamarck-eks-rc"
+              NAMESPACE="penroselamarck-rc"
+            elif [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              DEPLOY_ENV="prod"
+              CLUSTER_NAME="penroselamarck-eks-prod"
+              NAMESPACE="penroselamarck-prod"
+            else
+              echo "Unsupported version suffix in tag: $TAG" >&2
+              exit 1
+            fi
+          fi
+
+          echo "stack_version=$VERSION_SUFFIX" >> "$GITHUB_OUTPUT"
+          echo "tag_kind=$TAG_KIND" >> "$GITHUB_OUTPUT"
+          echo "deploy_env=$DEPLOY_ENV" >> "$GITHUB_OUTPUT"
+          echo "cluster_name=$CLUSTER_NAME" >> "$GITHUB_OUTPUT"
+          echo "namespace=$NAMESPACE" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Apply stack version from tag
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          if grep -qE '^eks:' stack-version.yaml; then
+            sed -E -i "s/^eks:.*/eks: ${{ steps.meta.outputs.stack_version }}/" stack-version.yaml
+          else
+            echo "eks: ${{ steps.meta.outputs.stack_version }}" >> stack-version.yaml
+          fi
+          echo "Using stack-version.yaml:"
+          cat stack-version.yaml
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'eu-central-1' }}
+
+      - name: Validate VPC configuration
+        run: |
+          set -euo pipefail
+          if [[ -z "${VPC_ID:-}" ]]; then
+            echo "Missing repository variable VPC_ID. Set it to the existing VPC ID used by the EKS stack." >&2
+            exit 1
+          fi
+          if [[ "${WEB_STANDALONE_DEBUG}" != "true" && "${WEB_STANDALONE_DEBUG}" != "false" ]]; then
+            echo "Invalid WEB_STANDALONE_DEBUG='${WEB_STANDALONE_DEBUG}'. Allowed values: true|false." >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Deploy EKS stack
+        env:
+          PENROSELAMARCK_DEPLOY_ENV: ${{ steps.meta.outputs.deploy_env }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.meta.outputs.tag_kind }}" == "release" ]]; then
+            npm run deploy -- \
+              PenroselamarckEksStack \
+              --require-approval never \
+              --parameters Namespace="${{ steps.meta.outputs.namespace }}" \
+              --parameters WebStandaloneDebug="${WEB_STANDALONE_DEBUG}" \
+              --parameters DocsImage="ghcr.io/${{ github.repository_owner }}/penrose-lamarck-docs:${{ steps.meta.outputs.image_tag }}" \
+              --parameters ApiImage="ghcr.io/${{ github.repository_owner }}/penrose-lamarck-api:${{ steps.meta.outputs.image_tag }}" \
+              --parameters WebImage="ghcr.io/${{ github.repository_owner }}/penrose-lamarck-web:${{ steps.meta.outputs.image_tag }}" \
+              --parameters DbImage="ghcr.io/${{ github.repository_owner }}/penrose-lamarck-pg:${{ steps.meta.outputs.image_tag }}"
+          elif [[ "${{ steps.meta.outputs.tag_kind }}" == "web-rollout" ]]; then
+            npm run deploy -- \
+              PenroselamarckEksStack \
+              --require-approval never \
+              --parameters Namespace="${{ steps.meta.outputs.namespace }}" \
+              --parameters WebStandaloneDebug="${WEB_STANDALONE_DEBUG}" \
+              --parameters WebImage="ghcr.io/${{ github.repository_owner }}/penrose-lamarck-web:${{ steps.meta.outputs.image_tag }}"
+          else
+            npm run deploy -- \
+              PenroselamarckEksStack \
+              --require-approval never \
+              --parameters Namespace="${{ steps.meta.outputs.namespace }}" \
+              --parameters WebStandaloneDebug="${WEB_STANDALONE_DEBUG}"
+          fi

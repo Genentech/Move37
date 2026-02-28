@@ -34,6 +34,22 @@ alembic -c /app/alembic.ini upgrade head || {
     exit 1
 }
 
+is_truthy() {
+    value=$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')
+    [ "$value" = "1" ] || [ "$value" = "true" ] || [ "$value" = "yes" ] || [ "$value" = "on" ]
+}
+
+if is_truthy "${DB_MOCK_DATA:-false}"; then
+    echo "[wrapper] DB_MOCK_DATA=true, running deterministic seed module..."
+    python3 -m penroselamarck.db.bin.seed || {
+        echo "[wrapper] Seed failed" >&2
+        kill $PG_PID
+        exit 1
+    }
+else
+    echo "[wrapper] DB_MOCK_DATA=false, skipping deterministic seed module."
+fi
+
 # Attach to Postgres foreground
 echo "[wrapper] Migrations complete. Attaching to Postgres foreground..."
 wait $PG_PID
