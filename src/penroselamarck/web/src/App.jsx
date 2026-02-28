@@ -11,8 +11,7 @@ const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const TOPBAR_MESSAGES = [
   "Doing now what patients need next",
   "F. Hoffman-La Roche AG",
-  "gRED / Computational Sciences / DDC Solutions",
-  "https://github.com/Genentech/penrose-lamarck ● 2026",
+  "gRED / Computational Sciences"
 ];
 const SEARCH_PLACEHOLDER = "search:uid";
 
@@ -518,16 +517,16 @@ export default function App() {
               <stop offset="100%" stopColor="#2a4f8f" stopOpacity="0" />
             </radialGradient>
             <radialGradient id="sphere-halo-success" cx="50%" cy="50%">
-              <stop offset="58%" stopColor="#6bf0b9" stopOpacity="0" />
-              <stop offset="74%" stopColor="#62ffbf" stopOpacity="0.24" />
-              <stop offset="84%" stopColor="#3fd499" stopOpacity="0.16" />
-              <stop offset="100%" stopColor="#1d6f53" stopOpacity="0" />
+              <stop offset="58%" stopColor="#3dff8f" stopOpacity="0" />
+              <stop offset="74%" stopColor="#00ff66" stopOpacity="0.34" />
+              <stop offset="84%" stopColor="#00d958" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#0a5a2d" stopOpacity="0" />
             </radialGradient>
             <radialGradient id="sphere-halo-failure" cx="50%" cy="50%">
-              <stop offset="58%" stopColor="#ff7a94" stopOpacity="0" />
-              <stop offset="74%" stopColor="#ff638a" stopOpacity="0.24" />
-              <stop offset="84%" stopColor="#dd3f68" stopOpacity="0.16" />
-              <stop offset="100%" stopColor="#6e1d36" stopOpacity="0" />
+              <stop offset="58%" stopColor="#ff4d6d" stopOpacity="0" />
+              <stop offset="74%" stopColor="#ff1e3c" stopOpacity="0.34" />
+              <stop offset="84%" stopColor="#d80027" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#5f0b1a" stopOpacity="0" />
             </radialGradient>
             <radialGradient id="sphere-vignette" cx="50%" cy="50%">
               <stop offset="0%" stopColor="#00000000" />
@@ -545,13 +544,23 @@ export default function App() {
             rx={Math.min(size.width, size.height) * 0.41 * zoom}
             ry={Math.min(size.width, size.height) * 0.41 * zoom}
             className="sphere-glow"
-            fill={
-              searchState === "success"
-                ? "url(#sphere-halo-success)"
-                : searchState === "failure"
-                  ? "url(#sphere-halo-failure)"
-                  : "url(#sphere-halo)"
-            }
+            fill="url(#sphere-halo)"
+          />
+          <ellipse
+            cx={size.width / 2}
+            cy={size.height / 2}
+            rx={Math.min(size.width, size.height) * 0.41 * zoom}
+            ry={Math.min(size.width, size.height) * 0.41 * zoom}
+            className="sphere-glow-success"
+            fill="url(#sphere-halo-success)"
+          />
+          <ellipse
+            cx={size.width / 2}
+            cy={size.height / 2}
+            rx={Math.min(size.width, size.height) * 0.41 * zoom}
+            ry={Math.min(size.width, size.height) * 0.41 * zoom}
+            className="sphere-glow-failure"
+            fill="url(#sphere-halo-failure)"
           />
 
           <g className={`graph-layer ${nodesVisible ? "visible" : "hidden"}`}>
@@ -681,6 +690,12 @@ export default function App() {
           <input
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                runUriSearch();
+              }
+            }}
             placeholder={SEARCH_PLACEHOLDER}
             aria-label="Search exercise URI"
           />

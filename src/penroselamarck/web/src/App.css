@@ -137,6 +137,20 @@
   transition: opacity 500ms ease;
 }
 
+.sphere-glow-success,
+.sphere-glow-failure {
+  opacity: 0;
+  transition: opacity 900ms ease;
+}
+
+.sphere-area.success .sphere-glow-success {
+  opacity: 1;
+}
+
+.sphere-area.failure .sphere-glow-failure {
+  opacity: 1;
+}
+
 .graph-layer {
   transition: opacity 500ms ease;
 }
@@ -253,7 +267,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: 1.15rem;
   z-index: 6;
   display: flex;
   justify-content: center;
@@ -350,5 +364,9 @@
   .sphere-area {
     min-height: 100dvh;
     height: 100dvh;
+  }
+
+  .bottombar {
+    bottom: 1.55rem;
   }
 }

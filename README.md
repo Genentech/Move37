@@ -276,7 +276,7 @@ Use the issue templates below to create implementation tickets that map 1:1 to t
 
 This model is practice-first: Penrose-Lamarck stores exercises, sessions, attempts, and per-exercise aggregates used by exercise selection and progress tracking.
 
-URI convention (EpicShelter-style logic):
+URI convention (Penrose-Lamarck-style logic):
 - URIs use a stable 3-part identifier pattern: `<namespace>:<entity>:<hash>`.
 - Penrose-Lamarck namespace: `pluid`.
 - Entity segment is table/model scoped (`exercise`, `practice-session`, `attempt`, `performance-summary`).
@@ -506,7 +506,7 @@ git config --local commit.gpgsign true
 Apply to both repos in this workspace:
 
 ```bash
-cd /Users/pereid22/source/epicshelter
+cd /Users/pereid22/source/penrose-lamarck
 git config --local gpg.format ssh
 git config --local user.signingkey /Users/pereid22/.ssh/gh_roche_ed25519.pub
 git config --local commit.gpgsign true
