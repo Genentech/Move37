@@ -1,3 +1,0 @@
-- For local deployments, use Minio.
-- For remote deployments, if AWS is available, use AWS S3
-- otherwise, use Azure Blob Storage.

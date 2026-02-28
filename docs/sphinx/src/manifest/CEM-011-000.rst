@@ -1,3 +1,0 @@
-When you start approaching a task, you identify sub-tasks that can be solved independently.
-By breaking down the problem into smaller, manageable components, you can focus on each part
-individually, making it easier to achieve the task.

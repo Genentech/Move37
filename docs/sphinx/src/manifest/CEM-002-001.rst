@@ -1,2 +1,0 @@
-- If you have to consume a large volume of vector data, use Milvus.
-- If you have to consume a small volume of vector data, use Milvus Lite.
