@@ -420,11 +420,6 @@ export default function App() {
       >
         <svg viewBox={`0 0 ${size.width} ${size.height}`} role="img">
           <defs>
-            <radialGradient id="sphere-core" cx="50%" cy="48%">
-              <stop offset="0%" stopColor="#c9f0ff" stopOpacity="0.24" />
-              <stop offset="55%" stopColor="#7eb5db" stopOpacity="0.09" />
-              <stop offset="100%" stopColor="#0d1222" stopOpacity="0" />
-            </radialGradient>
             <radialGradient id="sphere-halo" cx="50%" cy="50%">
               <stop offset="58%" stopColor="#86cbff" stopOpacity="0" />
               <stop offset="74%" stopColor="#7cc9ff" stopOpacity="0.2" />
@@ -449,15 +444,6 @@ export default function App() {
             fill="url(#sphere-halo)"
           />
 
-          <ellipse
-            cx={size.width / 2}
-            cy={size.height / 2}
-            rx={Math.min(size.width, size.height) * 0.36 * zoom}
-            ry={Math.min(size.width, size.height) * 0.36 * zoom}
-            fill="url(#sphere-core)"
-            stroke="#5f94cc1f"
-          />
-
           {edges.map((edge) => {
             const from = projected.byId[edge.source];
             const to = projected.byId[edge.target];
@@ -472,14 +458,23 @@ export default function App() {
             const length = Math.hypot(dx, dy) || 1;
             const nx = -dy / length;
             const ny = dx / length;
-            const nodeThickness = (active ? 2.6 : 1.8) + edge.weight * 0.45;
-            const midThickness = (active ? 0.9 : 0.55) + edge.weight * 0.18;
+            const q1x = from.x + dx * 0.18;
+            const q1y = from.y + dy * 0.18;
+            const q3x = to.x - dx * 0.18;
+            const q3y = to.y - dy * 0.18;
+            const nodeThickness = (active ? 2.2 : 1.45) + edge.weight * 0.3;
+            const taperThickness = (active ? 0.52 : 0.32) + edge.weight * 0.1;
+            const midThickness = active ? 0.18 : 0.1;
             const points = [
               `${from.x + nx * nodeThickness},${from.y + ny * nodeThickness}`,
+              `${q1x + nx * taperThickness},${q1y + ny * taperThickness}`,
               `${midX + nx * midThickness},${midY + ny * midThickness}`,
+              `${q3x + nx * taperThickness},${q3y + ny * taperThickness}`,
               `${to.x + nx * nodeThickness},${to.y + ny * nodeThickness}`,
               `${to.x - nx * nodeThickness},${to.y - ny * nodeThickness}`,
+              `${q3x - nx * taperThickness},${q3y - ny * taperThickness}`,
               `${midX - nx * midThickness},${midY - ny * midThickness}`,
+              `${q1x - nx * taperThickness},${q1y - ny * taperThickness}`,
               `${from.x - nx * nodeThickness},${from.y - ny * nodeThickness}`,
             ].join(" ");
             return (
