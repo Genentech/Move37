@@ -6,3 +6,4 @@
 -r repositories/python-requirements.txt
 -r schemas/python-requirements.txt
 -r services/python-requirements.txt
+-r orchestrator/python-requirements.txt
