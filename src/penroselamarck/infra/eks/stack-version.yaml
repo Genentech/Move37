@@ -1,0 +1,4 @@
+# Stack versions used for deployment naming and traceability tags.
+# Update these values when promoting each stack independently.
+eks: 1.0.0
+oidc: 1.0.0
