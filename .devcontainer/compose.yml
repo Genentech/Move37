@@ -1,5 +1,5 @@
 # create the network before building the devcontainer
-# docker network create penrose-lamarck
+# docker network create penroselamarck-network
 #
 # build base, tools and devcontainer images (don't pull, they don't exist on first run)
 # docker compose -f .devcontainer/compose.yml build base
@@ -14,7 +14,7 @@
 # takes as the project name. This can cause issues with dependencies on other
 # containers.
 #
-name: penrose-lamarck
+name: penroselamarck
 services:
   # Base development image with system dependencies
   base:

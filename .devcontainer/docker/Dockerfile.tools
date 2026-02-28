@@ -29,6 +29,46 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Install kubectl
+RUN set -eux; \
+    ARCH="$(dpkg --print-architecture)"; \
+    case "$ARCH" in \
+      amd64) K_ARCH="amd64" ;; \
+      arm64) K_ARCH="arm64" ;; \
+      *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    K_VERSION="$(curl -fsSL https://dl.k8s.io/release/stable.txt)"; \
+    curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/${K_VERSION}/bin/linux/${K_ARCH}/kubectl"; \
+    chmod +x /usr/local/bin/kubectl; \
+    kubectl version --client
+
+# Install Vault CLI
+RUN set -eux; \
+    ARCH="$(dpkg --print-architecture)"; \
+    case "$ARCH" in \
+      amd64) V_ARCH="amd64" ;; \
+      arm64) V_ARCH="arm64" ;; \
+      *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    V_VERSION="$(curl -fsSL https://checkpoint-api.hashicorp.com/v1/check/vault | jq -r '.current_version')"; \
+    curl -fsSL -o /tmp/vault.zip "https://releases.hashicorp.com/vault/${V_VERSION}/vault_${V_VERSION}_linux_${V_ARCH}.zip"; \
+    unzip -q /tmp/vault.zip -d /usr/local/bin; \
+    chmod +x /usr/local/bin/vault; \
+    rm -f /tmp/vault.zip; \
+    vault version
+
+# Install ArgoCD CLI
+RUN set -eux; \
+    ARCH="$(dpkg --print-architecture)"; \
+    case "$ARCH" in \
+      amd64) A_ARCH="amd64" ;; \
+      arm64) A_ARCH="arm64" ;; \
+      *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL -o /usr/local/bin/argocd "https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-${A_ARCH}"; \
+    chmod +x /usr/local/bin/argocd; \
+    argocd version --client
+
 # Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
@@ -43,6 +83,7 @@ RUN curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
   && rm -rf /var/lib/apt/lists/*
 
 # Install hadolint (apt if available, otherwise fallback to GitHub release)
+ARG HADOLINT_VERSION=latest
 RUN set -eux; \
     if ! command -v hadolint >/dev/null 2>&1; then \
         if apt-get update && apt-get install -y hadolint; then \
@@ -50,7 +91,12 @@ RUN set -eux; \
         else \
             echo "apt install failed; fetching hadolint binary..."; \
             DL_TARGET="/usr/local/bin/hadolint"; \
-            curl -fsSL -o "$DL_TARGET" "https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64"; \
+            if [ "$HADOLINT_VERSION" = "latest" ]; then \
+                DL_URL="https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64"; \
+            else \
+                DL_URL="https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-Linux-x86_64"; \
+            fi; \
+            curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 10 -o "$DL_TARGET" "$DL_URL"; \
             chmod +x "$DL_TARGET"; \
             echo "hadolint installed to $DL_TARGET"; \
         fi; \

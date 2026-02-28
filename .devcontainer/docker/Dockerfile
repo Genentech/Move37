@@ -53,16 +53,18 @@ COPY .devcontainer/python-requirements.txt /tmp/requirements/devcontainer-python
 # Copy all requirement files referenced by the aggregator to preserve cache
 COPY python-requirements.txt /tmp/python-requirements.txt
 COPY tests/python-requirements.txt /tmp/tests/python-requirements.txt
+COPY tests/mcp/python-requirements.txt /tmp/tests/mcp/python-requirements.txt
+COPY docs/sphinx/requirements.txt /tmp/docs/sphinx/requirements.txt
 COPY src/penroselamarck/python-requirements.txt /tmp/src/penroselamarck/python-requirements.txt
 COPY src/penroselamarck/alembic/python-requirements.txt /tmp/src/penroselamarck/alembic/python-requirements.txt
 COPY src/penroselamarck/api/python-requirements.txt /tmp/src/penroselamarck/api/python-requirements.txt
 COPY src/penroselamarck/core/python-requirements.txt /tmp/src/penroselamarck/core/python-requirements.txt
 COPY src/penroselamarck/db/python-requirements.txt /tmp/src/penroselamarck/db/python-requirements.txt
-COPY src/penroselamarck/api/python-requirements.txt /tmp/src/penroselamarck/api/python-requirements.txt
 COPY src/penroselamarck/models/python-requirements.txt /tmp/src/penroselamarck/models/python-requirements.txt
 COPY src/penroselamarck/repositories/python-requirements.txt /tmp/src/penroselamarck/repositories/python-requirements.txt
 COPY src/penroselamarck/schemas/python-requirements.txt /tmp/src/penroselamarck/schemas/python-requirements.txt
 COPY src/penroselamarck/services/python-requirements.txt /tmp/src/penroselamarck/services/python-requirements.txt
+COPY src/penroselamarck/orchestrator/python-requirements.txt /tmp/src/penroselamarck/orchestrator/python-requirements.txt
 
 RUN set -eux; \
     pip3 install --no-cache-dir -r /tmp/requirements/devcontainer-python-requirements.txt; \

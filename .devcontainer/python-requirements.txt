@@ -6,13 +6,15 @@ huggingface-hub==0.35.3
 
 # Project subpackages
 -r ../tests/python-requirements.txt
+-r ../tests/mcp/python-requirements.txt
+-r ../docs/sphinx/requirements.txt
 -r ../src/penroselamarck/python-requirements.txt
 -r ../src/penroselamarck/alembic/python-requirements.txt
 -r ../src/penroselamarck/api/python-requirements.txt
 -r ../src/penroselamarck/core/python-requirements.txt
 -r ../src/penroselamarck/db/python-requirements.txt
--r ../src/penroselamarck/api/python-requirements.txt
 -r ../src/penroselamarck/models/python-requirements.txt
 -r ../src/penroselamarck/repositories/python-requirements.txt
 -r ../src/penroselamarck/schemas/python-requirements.txt
 -r ../src/penroselamarck/services/python-requirements.txt
+-r ../src/penroselamarck/orchestrator/python-requirements.txt
