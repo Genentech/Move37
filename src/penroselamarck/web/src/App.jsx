@@ -8,6 +8,8 @@ const GITHUB_MARK_PNG =
 const API_TOKEN = import.meta.env.VITE_PENROSE_API_TOKEN || "web-local-dev";
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const TOPBAR_MESSAGES = ["Doing now what our patients need next", "F. Hoffman-La Roche AG"];
+const SEARCH_PLACEHOLDER = "input:uri";
 
 const MOCK_EXERCISES = [
   {
@@ -229,8 +231,12 @@ export default function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [exercises, setExercises] = useState([]);
   const [standaloneMode, setStandaloneMode] = useState(null);
-  const [modeLabel, setModeLabel] = useState("Detecting runtime mode...");
   const [selectedId, setSelectedId] = useState(null);
+  const [messageIndex, setMessageIndex] = useState(0);
+  const [messageVisible, setMessageVisible] = useState(true);
+  const [searchQuery, setSearchQuery] = useState(SEARCH_PLACEHOLDER);
+  const [searchState, setSearchState] = useState("idle");
+  const [nodesVisible, setNodesVisible] = useState(true);
   const { data: graphData, loading: graphLoading, error: graphError } = useExerciseGraph({
     baseUrl: "",
     token: API_TOKEN,
@@ -287,22 +293,17 @@ export default function App() {
     if (standaloneMode) {
       const normalized = MOCK_EXERCISES.map(normalizeExercise);
       setExercises(normalized);
-      setModeLabel("Standalone debug mode: using local mock exercise graph.");
       return;
     }
     if (graphLoading) {
-      setModeLabel("Loading exercise graph from API...");
       return;
     }
     if (graphError) {
       setExercises([]);
-      const message = graphError?.message || "unknown error";
-      setModeLabel(`API error while loading exercise graph: ${message}`);
       console.error("exercise graph load failed", graphError);
       return;
     }
     if (!graphData) {
-      setModeLabel("Waiting for exercise graph...");
       return;
     }
     const normalized = Array.isArray(graphData.nodes)
@@ -322,8 +323,29 @@ export default function App() {
         )
       : [];
     setExercises(normalized);
-    setModeLabel("Doing now what patients need next");
   }, [graphData, graphError, graphLoading, standaloneMode]);
+
+  useEffect(() => {
+    const holdMs = 10000;
+    const fadeMs = 750;
+    let holdTimer = 0;
+    let fadeTimer = 0;
+    const schedule = () => {
+      holdTimer = window.setTimeout(() => {
+        setMessageVisible(false);
+        fadeTimer = window.setTimeout(() => {
+          setMessageIndex((value) => (value + 1) % TOPBAR_MESSAGES.length);
+          setMessageVisible(true);
+          schedule();
+        }, fadeMs);
+      }, holdMs);
+    };
+    schedule();
+    return () => {
+      window.clearTimeout(holdTimer);
+      window.clearTimeout(fadeTimer);
+    };
+  }, []);
 
   const edges = useMemo(() => buildClassEdges(exercises), [exercises]);
 
@@ -367,6 +389,49 @@ export default function App() {
     () => edges.filter((edge) => edge.source === selectedId || edge.target === selectedId),
     [edges, selectedId]
   );
+
+  const relatedIds = useMemo(() => {
+    const ids = new Set();
+    selectedEdges.forEach((edge) => {
+      if (edge.source !== selectedId) {
+        ids.add(edge.source);
+      }
+      if (edge.target !== selectedId) {
+        ids.add(edge.target);
+      }
+    });
+    return ids;
+  }, [selectedEdges, selectedId]);
+
+  async function runUriSearch() {
+    if (searchState === "searching") {
+      return;
+    }
+    const query = searchQuery.trim().toLowerCase();
+    setSelectedId(null);
+    setNodesVisible(false);
+    setSearchState("searching");
+    await new Promise((resolve) => window.setTimeout(resolve, 1200));
+    const found = query
+      ? exercises.find((exercise) => {
+          const exerciseId = exercise.id.toLowerCase();
+          const exerciseUri = exercise.uri.toLowerCase();
+          return (
+            exerciseId === query ||
+            exerciseUri === query ||
+            exerciseId.includes(query) ||
+            exerciseUri.includes(query)
+          );
+        })
+      : null;
+    setSearchState(found ? "success" : "failure");
+    if (found) {
+      setSelectedId(found.id);
+    }
+    setNodesVisible(true);
+    await new Promise((resolve) => window.setTimeout(resolve, 900));
+    setSearchState("idle");
+  }
 
   function onPointerDown(event) {
     if (event.target === event.currentTarget) {
@@ -412,8 +477,10 @@ export default function App() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <p className="eyebrow">PENROSE-LAMARCK</p>
-          <p className="status">{modeLabel}</p>
+          <p className="eyebrow">PENSORE-LAMARCK</p>
+          <p className={`status ${messageVisible ? "visible" : "hidden"}`}>
+            {TOPBAR_MESSAGES[messageIndex]}
+          </p>
         </div>
         <a
           className="github-link"
@@ -429,7 +496,7 @@ export default function App() {
 
       <section
         ref={shellRef}
-        className={`sphere-area ${isDragging ? "dragging" : ""}`}
+        className={`sphere-area ${isDragging ? "dragging" : ""} ${searchState}`}
         aria-label="Exercise class network"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -460,88 +527,92 @@ export default function App() {
             cy={size.height / 2}
             rx={Math.min(size.width, size.height) * 0.41 * zoom}
             ry={Math.min(size.width, size.height) * 0.41 * zoom}
+            className="sphere-glow"
             fill="url(#sphere-halo)"
           />
 
-          {edges.map((edge) => {
-            const from = projected.byId[edge.source];
-            const to = projected.byId[edge.target];
-            if (!from || !to) {
-              return null;
-            }
-            const active = selectedId && (edge.source === selectedId || edge.target === selectedId);
-            const midX = (from.x + to.x) / 2;
-            const midY = (from.y + to.y) / 2;
-            const dx = to.x - from.x;
-            const dy = to.y - from.y;
-            const length = Math.hypot(dx, dy) || 1;
-            const nx = -dy / length;
-            const ny = dx / length;
-            const q1x = from.x + dx * 0.18;
-            const q1y = from.y + dy * 0.18;
-            const q3x = to.x - dx * 0.18;
-            const q3y = to.y - dy * 0.18;
-            const nodeThickness = (active ? 2.2 : 1.45) + edge.weight * 0.3;
-            const taperThickness = (active ? 0.52 : 0.32) + edge.weight * 0.1;
-            const midThickness = active ? 0.18 : 0.1;
-            const points = [
-              `${from.x + nx * nodeThickness},${from.y + ny * nodeThickness}`,
-              `${q1x + nx * taperThickness},${q1y + ny * taperThickness}`,
-              `${midX + nx * midThickness},${midY + ny * midThickness}`,
-              `${q3x + nx * taperThickness},${q3y + ny * taperThickness}`,
-              `${to.x + nx * nodeThickness},${to.y + ny * nodeThickness}`,
-              `${to.x - nx * nodeThickness},${to.y - ny * nodeThickness}`,
-              `${q3x - nx * taperThickness},${q3y - ny * taperThickness}`,
-              `${midX - nx * midThickness},${midY - ny * midThickness}`,
-              `${q1x - nx * taperThickness},${q1y - ny * taperThickness}`,
-              `${from.x - nx * nodeThickness},${from.y - ny * nodeThickness}`,
-            ].join(" ");
-            return (
-              <polygon
-                key={`${edge.source}-${edge.target}`}
-                points={points}
-                fill={active ? "#8fe6ff" : "#6f8db64f"}
-                opacity={active ? 0.82 : 0.38}
-              />
-            );
-          })}
+          <g className={`graph-layer ${nodesVisible ? "visible" : "hidden"}`}>
+            {edges.map((edge) => {
+              const from = projected.byId[edge.source];
+              const to = projected.byId[edge.target];
+              if (!from || !to) {
+                return null;
+              }
+              const active = selectedId && (edge.source === selectedId || edge.target === selectedId);
+              const midX = (from.x + to.x) / 2;
+              const midY = (from.y + to.y) / 2;
+              const dx = to.x - from.x;
+              const dy = to.y - from.y;
+              const length = Math.hypot(dx, dy) || 1;
+              const nx = -dy / length;
+              const ny = dx / length;
+              const q1x = from.x + dx * 0.18;
+              const q1y = from.y + dy * 0.18;
+              const q3x = to.x - dx * 0.18;
+              const q3y = to.y - dy * 0.18;
+              const nodeThickness = (active ? 2.2 : 1.45) + edge.weight * 0.3;
+              const taperThickness = (active ? 0.52 : 0.32) + edge.weight * 0.1;
+              const midThickness = active ? 0.18 : 0.1;
+              const points = [
+                `${from.x + nx * nodeThickness},${from.y + ny * nodeThickness}`,
+                `${q1x + nx * taperThickness},${q1y + ny * taperThickness}`,
+                `${midX + nx * midThickness},${midY + ny * midThickness}`,
+                `${q3x + nx * taperThickness},${q3y + ny * taperThickness}`,
+                `${to.x + nx * nodeThickness},${to.y + ny * nodeThickness}`,
+                `${to.x - nx * nodeThickness},${to.y - ny * nodeThickness}`,
+                `${q3x - nx * taperThickness},${q3y - ny * taperThickness}`,
+                `${midX - nx * midThickness},${midY - ny * midThickness}`,
+                `${q1x - nx * taperThickness},${q1y - ny * taperThickness}`,
+                `${from.x - nx * nodeThickness},${from.y - ny * nodeThickness}`,
+              ].join(" ");
+              return (
+                <polygon
+                  key={`${edge.source}-${edge.target}`}
+                  points={points}
+                  fill={active ? "#8fe6ff" : "#6f8db64f"}
+                  opacity={active ? 0.82 : 0.38}
+                />
+              );
+            })}
 
-          {projected.ordered.map((exercise) => {
-            const selectedNode = exercise.id === selectedId;
-            const radius = 4.4 + exercise.classes.length * 0.65 + exercise.depth * 0.6;
-            return (
-              <g key={exercise.id} transform={`translate(${exercise.x} ${exercise.y})`}>
-                <circle
-                  r={radius + 5}
-                  className={selectedNode ? "node-halo active" : "node-halo"}
-                  onPointerDown={(event) => {
-                    event.stopPropagation();
-                    setSelectedId(exercise.id);
-                  }}
-                />
-                <circle
-                  r={radius}
-                  className={selectedNode ? "node-core active" : "node-core"}
-                  onPointerDown={(event) => {
-                    event.stopPropagation();
-                    setSelectedId(exercise.id);
-                  }}
-                />
-                <text
-                  x={radius + 7}
-                  y={-radius - 2}
-                  className="node-uri"
-                  opacity={Math.max(0.25, Math.min(0.92, exercise.depth - 0.18))}
-                  onPointerDown={(event) => {
-                    event.stopPropagation();
-                    setSelectedId(exercise.id);
-                  }}
-                >
-                  {exercise.uri}
-                </text>
-              </g>
-            );
-          })}
+            {projected.ordered.map((exercise) => {
+              const selectedNode = exercise.id === selectedId;
+              const relatedNode = !selectedNode && relatedIds.has(exercise.id);
+              const radius = 4.4 + exercise.classes.length * 0.65 + exercise.depth * 0.6;
+              return (
+                <g key={exercise.id} transform={`translate(${exercise.x} ${exercise.y})`}>
+                  <circle
+                    r={radius + 5}
+                    className={selectedNode ? "node-halo active" : relatedNode ? "node-halo related" : "node-halo"}
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                      setSelectedId(exercise.id);
+                    }}
+                  />
+                  <circle
+                    r={radius}
+                    className={selectedNode ? "node-core active" : relatedNode ? "node-core related" : "node-core"}
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                      setSelectedId(exercise.id);
+                    }}
+                  />
+                  <text
+                    x={radius + 7}
+                    y={-radius - 2}
+                    className="node-uri"
+                    opacity={Math.max(0.25, Math.min(0.92, exercise.depth - 0.18))}
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                      setSelectedId(exercise.id);
+                    }}
+                  >
+                    {exercise.uri}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
         </svg>
       </section>
 
@@ -581,6 +652,33 @@ export default function App() {
           </aside>
         </div>
       )}
+
+      <footer className="bottombar">
+        <div className="uri-search">
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            aria-label="Search exercise URI"
+          />
+          <button
+            type="button"
+            className="search-trigger"
+            onClick={runUriSearch}
+            aria-label="Search URI"
+            title="Search URI"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M10.5 3.5a7 7 0 1 0 4.24 12.58l4.84 4.84a1 1 0 1 0 1.42-1.42l-4.84-4.84A7 7 0 0 0 10.5 3.5Zm0 2a5 5 0 1 1 0 10a5 5 0 0 1 0-10Z"
+                fill="currentColor"
+              />
+            </svg>
+          </button>
+        </div>
+      </footer>
+      <p className="footer-attribution">
+        Roche / gRED / Computational Sciences / DDC Solutions <span aria-hidden="true">●</span> 2026
+      </p>
     </main>
   );
 }
