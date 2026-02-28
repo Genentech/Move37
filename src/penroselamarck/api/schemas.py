@@ -181,6 +181,7 @@ class ExerciseCreateInput(BaseModel):
     answer: str
     language: str
     tags: list[str] | None = None
+    classes: list[str] | None = None
 
 
 class ExerciseListFilters(BaseModel):
@@ -208,6 +209,7 @@ class ExerciseListFilters(BaseModel):
 
     language: str | None = None
     tags: list[str] | None = None
+    classes: list[str] | None = None
     limit: int | None = 50
     offset: int | None = 0
 
@@ -241,6 +243,7 @@ class ExerciseListItem(BaseModel):
     question: str
     language: str
     tags: list[str] | None = None
+    classes: list[str] | None = None
     stats: dict | None = None
 
 
@@ -273,7 +276,53 @@ class TrainImportItem(BaseModel):
     answer: str
     language: str
     tags: list[str] | None = None
+    classes: list[str] | None = None
     source: str | None = None
+
+
+class ExerciseGraphNode(BaseModel):
+    id: str
+    label: str
+    language: str
+    tags: list[str]
+    classes: list[str]
+
+
+class ExerciseGraphEdge(BaseModel):
+    source: str
+    target: str
+    sharedTags: list[str]
+    sharedClasses: list[str]
+    weight: int
+
+
+class ExerciseGraphOutput(BaseModel):
+    nodes: list[ExerciseGraphNode]
+    edges: list[ExerciseGraphEdge]
+
+
+class ExerciseSearchQuery(BaseModel):
+    query: str
+    language: str | None = None
+    limit: int | None = 20
+
+
+class ExerciseSearchItem(BaseModel):
+    exerciseId: str
+    question: str
+    language: str
+    tags: list[str] | None = None
+    classes: list[str] | None = None
+    score: float
+
+
+class ExerciseClassifyOutput(BaseModel):
+    scanned: int
+    updated: int
+
+
+class ExerciseClassifyInput(BaseModel):
+    limit: int | None = 50
 
 
 class TrainImportRequest(BaseModel):

@@ -31,7 +31,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from penroselamarck.api.dependencies import get_current_user, get_mcp_transport
+from penroselamarck.api.dependencies import get_current_user_mcp, get_mcp_transport
 from penroselamarck.api.transport import McpHttpTransport
 from penroselamarck.repositories.user_repository import UserRecord
 
@@ -42,7 +42,7 @@ router = APIRouter()
 async def mcp_sse(
     request: Request,
     transport: Annotated[McpHttpTransport, Depends(get_mcp_transport)],
-    current_user: Annotated[UserRecord, Depends(get_current_user)],
+    current_user: Annotated[UserRecord, Depends(get_current_user_mcp)],
 ):
     """
     mcp_sse(request, transport, current_user) -> StreamingResponse
@@ -76,7 +76,7 @@ async def mcp_messages(
     request: Request,
     session_id: str,
     transport: Annotated[McpHttpTransport, Depends(get_mcp_transport)],
-    current_user: Annotated[UserRecord, Depends(get_current_user)],
+    current_user: Annotated[UserRecord, Depends(get_current_user_mcp)],
 ) -> dict:
     """
     mcp_messages(request, session_id, transport, current_user) -> Dict
@@ -112,7 +112,7 @@ async def mcp_messages(
 async def mcp_streamable_http(
     request: Request,
     transport: Annotated[McpHttpTransport, Depends(get_mcp_transport)],
-    current_user: Annotated[UserRecord, Depends(get_current_user)],
+    current_user: Annotated[UserRecord, Depends(get_current_user_mcp)],
 ) -> JSONResponse:
     """
     mcp_streamable_http(request, transport, current_user) -> JSONResponse

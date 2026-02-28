@@ -106,6 +106,17 @@ class McpToolRegistry:
             ),
             ToolDefinition("exercise.create", "Create an exercise.", schemas.ExerciseCreateInput),
             ToolDefinition("exercise.list", "List exercises.", schemas.ExerciseListFilters),
+            ToolDefinition("exercise.graph", "Build exercise graph.", schemas.ExerciseListFilters),
+            ToolDefinition(
+                "exercise.search",
+                "Semantic search exercises.",
+                schemas.ExerciseSearchQuery,
+            ),
+            ToolDefinition(
+                "exercise.classify",
+                "Classify unclassified exercises.",
+                schemas.ExerciseClassifyInput,
+            ),
             ToolDefinition("train.import", "Bulk import exercises.", schemas.TrainImportRequest),
             ToolDefinition(
                 "practice.start", "Start a practice session.", schemas.PracticeStartInput
@@ -124,6 +135,9 @@ class McpToolRegistry:
             "study.context.get": self._handle_context_get,
             "exercise.create": self._handle_exercise_create,
             "exercise.list": self._handle_exercise_list,
+            "exercise.graph": self._handle_exercise_graph,
+            "exercise.search": self._handle_exercise_search,
+            "exercise.classify": self._handle_exercise_classify,
             "train.import": self._handle_train_import,
             "practice.start": self._handle_practice_start,
             "practice.next": self._handle_practice_next,
@@ -293,6 +307,7 @@ class McpToolRegistry:
             answer=payload.answer,
             language=payload.language,
             tags=payload.tags,
+            classes=payload.classes,
         )
         return schemas.ExerciseListItem(**row).model_dump()
 
@@ -316,10 +331,32 @@ class McpToolRegistry:
         rows = self._services.exercise_service.list_exercises(
             language=payload.language,
             tags=payload.tags,
+            classes=payload.classes,
             limit=payload.limit or 50,
             offset=payload.offset or 0,
         )
         return [schemas.ExerciseListItem(**row).model_dump() for row in rows]
+
+    def _handle_exercise_graph(self, arguments: dict) -> dict:
+        payload = schemas.ExerciseListFilters.model_validate(arguments)
+        graph = self._services.exercise_service.build_exercise_graph(language=payload.language)
+        return schemas.ExerciseGraphOutput(**graph).model_dump()
+
+    def _handle_exercise_search(self, arguments: dict) -> list[dict]:
+        payload = schemas.ExerciseSearchQuery.model_validate(arguments)
+        rows = self._services.exercise_service.semantic_search_exercises(
+            query=payload.query,
+            language=payload.language,
+            limit=payload.limit or 20,
+        )
+        return [schemas.ExerciseSearchItem(**row).model_dump() for row in rows]
+
+    def _handle_exercise_classify(self, arguments: dict) -> dict:
+        payload = schemas.ExerciseClassifyInput.model_validate(arguments)
+        result = self._services.exercise_service.classify_unclassified_exercises(
+            limit=payload.limit or 50
+        )
+        return schemas.ExerciseClassifyOutput(**result).model_dump()
 
     def _handle_train_import(self, arguments: dict) -> dict:
         """

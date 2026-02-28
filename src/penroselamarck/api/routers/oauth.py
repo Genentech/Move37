@@ -53,8 +53,8 @@ def _normalize_base_url(value: str) -> str:
 
     Examples
     --------
-    >>> _normalize_base_url("http://penroselamarck-api:8080/")
-    'http://penroselamarck-api:8080/'
+    >>> _normalize_base_url("http://localhost:8080/")
+    'http://localhost:8080/'
     """
     return value
 

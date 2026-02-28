@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import uuid
 from collections.abc import Callable
 from typing import Any
@@ -42,6 +43,7 @@ from penroselamarck.api.tool_registry import McpToolRegistry
 from penroselamarck.services.errors import ServiceError
 
 DEFAULT_PROTOCOL_VERSION = "2024-11-05"
+DEFAULT_SERVER_NAME = "penroselamarck-api"
 
 
 class McpSessionManager:
@@ -529,12 +531,14 @@ class McpHttpTransport:
         Dict
             JSON-RPC initialization response.
         """
+        server_name = os.environ.get("MCP_SERVER_NAME", DEFAULT_SERVER_NAME) or DEFAULT_SERVER_NAME
+        server_version = os.environ.get("MCP_SERVER_VERSION", mcp_version) or mcp_version
         return self._result_response(
             request_id,
             {
                 "protocolVersion": DEFAULT_PROTOCOL_VERSION,
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "penroselamarck-api", "version": mcp_version},
+                "serverInfo": {"name": server_name, "version": server_version},
             },
         )
 

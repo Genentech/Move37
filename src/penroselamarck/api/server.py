@@ -27,9 +27,12 @@ See Also
 
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 
+from penroselamarck.api import __version__
 from penroselamarck.api.routers.oauth import router as oauth_router
 from penroselamarck.api.routers.v1 import build_v1_router
 from penroselamarck.api.tool_registry import McpToolRegistry
@@ -72,15 +75,22 @@ def create_app() -> FastAPI:
     FastAPI
         Configured FastAPI application.
     """
-    app = FastAPI(
-        title="Penrose-Lamarck MCP (HTTP bridge)",
-        version="0.2.0",
-        generate_unique_id_function=_generate_unique_id,
-    )
+    api_title = os.environ.get("API_TITLE", "Penrose-Lamarck MCP (HTTP bridge)")
+    api_version = os.environ.get("API_VERSION", __version__) or __version__
+    app = FastAPI(title=api_title, version=api_version, generate_unique_id_function=_generate_unique_id)
 
     services = ServiceContainer()
     app.state.services = services
     app.state.mcp_transport = McpHttpTransport(McpToolRegistry(services))
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        """
+        health() -> Dict[str, str]
+
+        Lightweight liveness endpoint for container and host checks.
+        """
+        return {"status": "ok"}
 
     @app.on_event("startup")
     def _startup() -> None:

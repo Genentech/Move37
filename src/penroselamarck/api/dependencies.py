@@ -25,12 +25,26 @@ See Also
 
 from __future__ import annotations
 
+import os
+
 from fastapi import Request
 
 from penroselamarck.api.transport import McpHttpTransport
 from penroselamarck.repositories.user_repository import UserRecord
 from penroselamarck.services.container import ServiceContainer
 from penroselamarck.services.errors import ServiceError
+
+
+def _is_truthy_env(name: str) -> bool:
+    """
+    _is_truthy_env(name) -> bool
+
+    Return True when an environment variable is set to a truthy value.
+    """
+    value = os.environ.get(name)
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _resource_metadata_url(request: Request) -> str:
@@ -184,3 +198,19 @@ def get_current_user(request: Request) -> UserRecord:
             detail=exc.message,
             headers={"WWW-Authenticate": _www_authenticate_header(request, exc.message)},
         ) from exc
+
+
+def get_current_user_mcp(request: Request) -> UserRecord:
+    """
+    get_current_user_mcp(request) -> UserRecord
+
+    Authenticate MCP requests unless explicitly disabled by environment.
+
+    Notes
+    -----
+    Authentication is bypassed only when ``MCP_AUTH_DISABLED`` is truthy.
+    """
+    if _is_truthy_env("MCP_AUTH_DISABLED"):
+        services = get_service_container(request)
+        return services.auth_service.demo_user()
+    return get_current_user(request)
