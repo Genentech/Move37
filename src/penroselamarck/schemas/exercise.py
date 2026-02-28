@@ -61,6 +61,7 @@ class Exercise(BaseModel):
     answer: str
     language: str
     tags: list[str] | None = None
+    classes: list[str] | None = None
     id: str | None = None
     content_hash: str | None = None
     created_at: datetime | None = None

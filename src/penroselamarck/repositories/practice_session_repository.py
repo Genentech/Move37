@@ -149,6 +149,7 @@ class PracticeSessionRepository:
                             "question": exercise.question,
                             "language": exercise.language,
                             "tags": exercise.tags,
+                            "classes": exercise.classes,
                         }
             return None
 

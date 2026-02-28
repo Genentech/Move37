@@ -108,7 +108,7 @@ class PracticeService:
         Dict
             Session identifier and selected exercises.
         """
-        rows = self._exercise_repository.list_exercises(language, None, count, 0)
+        rows = self._exercise_repository.list_exercises(language, None, None, count, 0)
         selected = [row["exerciseId"] for row in rows]
         session_id = self._session_repository.create_session(language, strategy, count, selected)
         return {

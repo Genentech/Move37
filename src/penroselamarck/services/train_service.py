@@ -89,6 +89,7 @@ class TrainService:
                     answer=item["answer"],
                     language=item["language"],
                     tags=item.get("tags"),
+                    classes=item.get("classes"),
                 )
                 imported += 1
             except ConflictError:

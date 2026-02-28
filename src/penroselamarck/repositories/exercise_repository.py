@@ -74,6 +74,7 @@ class ExerciseRepository:
         answer: str,
         language: str,
         tags: list[str] | None,
+        classes: list[str] | None,
         content_hash: str,
         exercise_id: str,
         created_at: datetime,
@@ -112,6 +113,7 @@ class ExerciseRepository:
                 answer=answer,
                 language=language,
                 tags=tags,
+                classes=classes,
                 content_hash=content_hash,
                 created_at=created_at,
             )
@@ -123,6 +125,7 @@ class ExerciseRepository:
         self,
         language: str | None,
         tags: list[str] | None,
+        classes: list[str] | None,
         limit: int,
         offset: int,
     ) -> list[dict]:
@@ -153,6 +156,8 @@ class ExerciseRepository:
                 stmt = stmt.where(Exercise.language == language)
             if tags:
                 stmt = stmt.where(Exercise.tags.contains(tags))
+            if classes:
+                stmt = stmt.where(Exercise.classes.contains(classes))
             stmt = stmt.offset(offset).limit(limit)
             rows = session.scalars(stmt).all()
             return [
@@ -161,6 +166,7 @@ class ExerciseRepository:
                     "question": r.question,
                     "language": r.language,
                     "tags": r.tags,
+                    "classes": r.classes,
                 }
                 for r in rows
             ]
@@ -191,6 +197,7 @@ class ExerciseRepository:
                 "answer": row.answer,
                 "language": row.language,
                 "tags": row.tags,
+                "classes": row.classes,
             }
 
     def exists_by_hash(self, content_hash: str) -> bool:
@@ -212,3 +219,66 @@ class ExerciseRepository:
         with Session(self._engine) as session:
             stmt = select(Exercise.id).where(Exercise.content_hash == content_hash)
             return session.scalar(stmt) is not None
+
+    def list_all_exercises(self, language: str | None = None) -> list[dict]:
+        """
+        list_all_exercises(language=None) -> List[Dict]
+
+        Return full exercise payloads used by graph/search/classification services.
+        """
+        with Session(self._engine) as session:
+            stmt = select(Exercise)
+            if language:
+                stmt = stmt.where(Exercise.language == language)
+            rows = session.scalars(stmt).all()
+            return [
+                {
+                    "exerciseId": row.id,
+                    "question": row.question,
+                    "answer": row.answer,
+                    "language": row.language,
+                    "tags": row.tags or [],
+                    "classes": row.classes or [],
+                }
+                for row in rows
+            ]
+
+    def update_exercise_classes(self, exercise_id: str, classes: list[str]) -> bool:
+        """
+        update_exercise_classes(exercise_id, classes) -> bool
+
+        Update class labels for one exercise.
+        """
+        with Session(self._engine) as session:
+            row = session.get(Exercise, exercise_id)
+            if row is None:
+                return False
+            row.classes = classes
+            session.add(row)
+            session.commit()
+            return True
+
+    def list_unclassified_exercises(self, limit: int = 50) -> list[dict]:
+        """
+        list_unclassified_exercises(limit=50) -> List[Dict]
+
+        Return exercises that still have no class labels.
+        """
+        with Session(self._engine) as session:
+            stmt = (
+                select(Exercise)
+                .where((Exercise.classes.is_(None)) | (Exercise.classes == []))
+                .limit(limit)
+            )
+            rows = session.scalars(stmt).all()
+            return [
+                {
+                    "exerciseId": row.id,
+                    "question": row.question,
+                    "answer": row.answer,
+                    "language": row.language,
+                    "tags": row.tags or [],
+                    "classes": row.classes or [],
+                }
+                for row in rows
+            ]
