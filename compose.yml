@@ -63,7 +63,7 @@ services:
   ##
   ## quick start (host-side Codex CLI compatible; uses localhost)
   ##
-  ##    docker compose down -v api && MCP_AUTH_DISABLED=true docker compose up -d --build db api
+  ##    docker compose down -v api && docker compose up -d --build db api
   ##
   ## rebuild only API (keep db volume/data)
   ##
@@ -138,7 +138,7 @@ services:
       - AUTH0_JWKS_TIMEOUT_SECONDS=${AUTH0_JWKS_TIMEOUT_SECONDS:-5}
       - MCP_RESOURCE_URL=${MCP_RESOURCE_URL:-}
       - MCP_OAUTH_SCOPES=${MCP_OAUTH_SCOPES:-}
-      - MCP_AUTH_DISABLED=${MCP_AUTH_DISABLED:-false}
+      - AUTH_DISABLED=${AUTH_DISABLED:-false}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - GITHUB_REPOSITORY=${GITHUB_REPOSITORY:-}
       - GITHUB_BASE_BRANCH=${GITHUB_BASE_BRANCH:-main}
@@ -178,6 +178,9 @@ services:
         WEB_SDK_SOURCE: local
     container_name: penroselamarck-web
     image: ghcr.io/genentech/penrose-lamarck-web:1.0.0
+    env_file:
+      - path: ./src/penroselamarck/web/.env
+        required: false
     ports:
       - "5173:80"
     depends_on:
@@ -478,13 +481,9 @@ services:
       dockerfile: src/penroselamarck/db/Dockerfile
     image: ghcr.io/genentech/penrose-lamarck-pg:1.0.0
     container_name: penroselamarck-db
-    environment:
-      - POSTGRES_USER=penroselamarck
-      - POSTGRES_PASSWORD=penroselamarck
-      - POSTGRES_DB=penroselamarck
-      - DB_MOCK_DATA=${DB_MOCK_DATA:-false}
-      - OPENLINEAGE_URL=http://marquez:5000
-      - OPENLINEAGE_NAMESPACE=penroselamarck
+    env_file:
+      - path: ./src/penroselamarck/db/.env
+        required: true
     ports:
       - "5432:5432"
     healthcheck:

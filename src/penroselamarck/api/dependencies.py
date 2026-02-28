@@ -169,6 +169,10 @@ def get_current_user(request: Request) -> UserRecord:
     """
     from fastapi import HTTPException, status
 
+    if _is_truthy_env("AUTH_DISABLED"):
+        services = get_service_container(request)
+        return services.auth_service.demo_user()
+
     authorization = request.headers.get("authorization")
     if not authorization:
         raise HTTPException(
@@ -208,9 +212,9 @@ def get_current_user_mcp(request: Request) -> UserRecord:
 
     Notes
     -----
-    Authentication is bypassed only when ``MCP_AUTH_DISABLED`` is truthy.
+    Authentication is bypassed only when ``AUTH_DISABLED`` is truthy.
     """
-    if _is_truthy_env("MCP_AUTH_DISABLED"):
+    if _is_truthy_env("AUTH_DISABLED"):
         services = get_service_container(request)
         return services.auth_service.demo_user()
     return get_current_user(request)

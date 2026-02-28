@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useExerciseGraph } from "@genentech/penroselamarck/react";
 import "./App.css";
 
 const GITHUB_REPO_URL = "https://github.com/genentech/penrose-lamarck";
 const GITHUB_MARK_PNG =
   "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png";
+const API_TOKEN = import.meta.env.VITE_PENROSE_API_TOKEN || "web-local-dev";
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
@@ -137,7 +139,7 @@ function normalizeExercise(row, index) {
     : [];
   return {
     id,
-    uri: String(row.uri || `exercise://${id}`),
+    uri: String(row.uri || id),
     question: String(row.question || id),
     answer: String(row.answer || ""),
     language: String(row.language || ""),
@@ -226,8 +228,14 @@ export default function App() {
   const [zoom, setZoom] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
   const [exercises, setExercises] = useState([]);
+  const [standaloneMode, setStandaloneMode] = useState(null);
   const [modeLabel, setModeLabel] = useState("Detecting runtime mode...");
   const [selectedId, setSelectedId] = useState(null);
+  const { data: graphData, loading: graphLoading, error: graphError } = useExerciseGraph({
+    baseUrl: "",
+    token: API_TOKEN,
+    enabled: standaloneMode === false,
+  });
 
   useEffect(() => {
     const node = shellRef.current;
@@ -265,48 +273,57 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    async function load() {
+    async function detectMode() {
       const standalone = await detectStandaloneDebug();
-      if (standalone) {
-        const normalized = MOCK_EXERCISES.map(normalizeExercise);
-        setExercises(normalized);
-        setModeLabel("Standalone debug mode: using local mock exercise graph.");
-        return;
-      }
-
-      try {
-        const response = await fetch("/v1/exercise/graph", { method: "GET" });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const payload = await response.json();
-        const normalized = Array.isArray(payload?.nodes)
-          ? payload.nodes.map((node, index) =>
-              normalizeExercise(
-                {
-                  id: node.id,
-                  uri: node.uri || `exercise://${node.id || `exercise-${index + 1}`}`,
-                  question: node.label || node.question,
-                  answer: "",
-                  language: node.language,
-                  tags: node.tags,
-                  classes: node.classes,
-                },
-                index
-              )
-            )
-          : [];
-        setExercises(normalized);
-        setModeLabel("Doing now what our patients need next.");
-      } catch {
-        const normalized = MOCK_EXERCISES.map(normalizeExercise);
-        setExercises(normalized);
-        setModeLabel("debug:on");
-      }
+      setStandaloneMode(standalone);
     }
-
-    load();
+    detectMode();
   }, []);
+
+  useEffect(() => {
+    if (standaloneMode === null) {
+      return;
+    }
+    if (standaloneMode) {
+      const normalized = MOCK_EXERCISES.map(normalizeExercise);
+      setExercises(normalized);
+      setModeLabel("Standalone debug mode: using local mock exercise graph.");
+      return;
+    }
+    if (graphLoading) {
+      setModeLabel("Loading exercise graph from API...");
+      return;
+    }
+    if (graphError) {
+      setExercises([]);
+      const message = graphError?.message || "unknown error";
+      setModeLabel(`API error while loading exercise graph: ${message}`);
+      console.error("exercise graph load failed", graphError);
+      return;
+    }
+    if (!graphData) {
+      setModeLabel("Waiting for exercise graph...");
+      return;
+    }
+    const normalized = Array.isArray(graphData.nodes)
+      ? graphData.nodes.map((node, index) =>
+          normalizeExercise(
+            {
+              id: node.id,
+              uri: node.uri || node.id || index + 1,
+              question: node.label || node.question,
+              answer: "",
+              language: node.language,
+              tags: node.tags,
+              classes: node.classes,
+            },
+            index
+          )
+        )
+      : [];
+    setExercises(normalized);
+    setModeLabel("Doing now what patients need next");
+  }, [graphData, graphError, graphLoading, standaloneMode]);
 
   const edges = useMemo(() => buildClassEdges(exercises), [exercises]);
 
@@ -384,7 +401,9 @@ export default function App() {
   }
 
   function onWheel(event) {
-    event.preventDefault();
+    if (event.cancelable) {
+      event.preventDefault();
+    }
     const zoomDelta = event.deltaY > 0 ? -0.08 : 0.08;
     setZoom((value) => Math.max(0.55, Math.min(1.8, value + zoomDelta)));
   }
