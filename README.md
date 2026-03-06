@@ -541,7 +541,36 @@ gh auth login -h github.com -u diogobaltazar
 
 ## Applicants
 
-If you're applying for a position in our team, having received an invitation from our Talent Partner, you have 7 days to submit your work. Upon a positive assessment, you'll be invited to the next steps of our recruitment process.
+If you're applying for a position in our team, having received an invitation from our Talent Partner, follow the process below.
+
+### What You Must Do
+
+- Create an anonymous GitHub account for the submission.
+- Fork this repository from that account.
+- Pick one or more GitHub issues and implement a solution for them.
+- Open a pull request from your fork against this repository.
+- Follow the repository PR template when writing your pull request.
+- The exercise should not take longer than approximately 1 hour of focused work, but you have at most 7 days to complete and submit it.
+- Your PR must satisfy the acceptance criteria of the issue(s) you addressed and complete the required sections of the PR template.
+
+### What We Will Look For In Your PR
+
+- A working solution for the selected issue or issues.
+- Clear evidence that you validated the change.
+- A prompt history showing how you used your coding assistant to explore and solve the task.
+- Notes on assistant mistakes, incomplete suggestions, or misleading suggestions, and how you corrected them.
+
+### Questions That May Follow A Successful PR
+
+If your PR is merged and the proposed solution is running locally, we may ask follow-up questions such as:
+
+- Why is the agent proposed solution working?
+- Where there parts of the proposed solution that you did not understand or looked into? If so, why?
+- Did you disagree with any of the assistant's suggestions?
+If so, which and how?
+- Did the assistant introduce any new dependencies, design choices, or patterns? If so, what trade-off analysis did you do before accepting them?
+- How did you convince yourself that the solution was correct?
+- Any limitations, deferred work, edge cases, or improvements you noticed but chose not to address.
 
 We sincerely wish you the best of luck and remain truly appreciative of any time you decide to put aside to working with us.
 
