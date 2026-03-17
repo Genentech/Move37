@@ -54,51 +54,89 @@ export function shiftCalendarAnchor(range, anchorDate, direction) {
   return addDays(anchorDate, direction * 7);
 }
 
-function TaskListBranch({ node, childMap, nodesById, path, depth, selectedId, onSelectNode }) {
+function TaskListBranch({
+  node,
+  childMap,
+  nodesById,
+  path,
+  depth,
+  selectedId,
+  onSelectNode,
+  onCreateChild,
+}) {
+  const [open, setOpen] = useState(depth === 0);
   const nextPath = new Set(path);
   nextPath.add(node.id);
   const children = (childMap.get(node.id) || [])
     .map((childId) => nodesById.get(childId))
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((left, right) => left.title.localeCompare(right.title));
 
   return (
-    <details className={`task-branch depth-${depth}`} open={depth === 0}>
-      <summary className={`task-summary ${selectedId === node.id ? "selected" : ""}`}>
+    <section className={`task-branch depth-${depth} ${open ? "open" : ""}`}>
+      <div className={`task-summary ${selectedId === node.id ? "selected" : ""}`}>
+        <button
+          type="button"
+          className={`task-toggle ${open ? "open" : ""}`}
+          onClick={() => setOpen((value) => !value)}
+          aria-label={open ? "Collapse branch" : "Expand branch"}
+        >
+          <span className="task-toggle-glyph" />
+        </button>
         <button type="button" className="task-title-button" onClick={() => onSelectNode(node.id)}>
           <span>{node.title}</span>
           <span className="task-summary-meta">
             {node.startDate ? node.startDate : "unscheduled"}
           </span>
         </button>
-      </summary>
-      <div className="task-branch-body">
-        {node.notes ? <p className="task-notes">{node.notes}</p> : null}
-        {children.length ? (
-          <div className="task-children">
-            {children.map((child) =>
-              nextPath.has(child.id) ? null : (
-                <TaskListBranch
-                  key={`${node.id}:${child.id}`}
-                  node={child}
-                  childMap={childMap}
-                  nodesById={nodesById}
-                  path={nextPath}
-                  depth={depth + 1}
-                  selectedId={selectedId}
-                  onSelectNode={onSelectNode}
-                />
-              ),
-            )}
-          </div>
-        ) : (
-          <p className="task-empty">No child tasks.</p>
-        )}
+        <button
+          type="button"
+          className="task-inline-action"
+          onClick={() => onCreateChild(node.id)}
+          aria-label={`Add child activity to ${node.title}`}
+          title="Add child activity"
+        >
+          +
+        </button>
       </div>
-    </details>
+      <div className="task-branch-collapse">
+        <div className="task-branch-body">
+          {node.notes ? <p className="task-notes">{node.notes}</p> : null}
+          {children.length ? (
+            <div className="task-children">
+              {children.map((child) =>
+                nextPath.has(child.id) ? null : (
+                  <TaskListBranch
+                    key={`${node.id}:${child.id}`}
+                    node={child}
+                    childMap={childMap}
+                    nodesById={nodesById}
+                    path={nextPath}
+                    depth={depth + 1}
+                    selectedId={selectedId}
+                    onSelectNode={onSelectNode}
+                    onCreateChild={onCreateChild}
+                  />
+                ),
+              )}
+            </div>
+          ) : (
+            <p className="task-empty">No child tasks.</p>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
-export function TaskListSurface({ graph, nodesById, selectedId, onSelectNode }) {
+export function TaskListSurface({
+  graph,
+  nodesById,
+  selectedId,
+  onSelectNode,
+  onCreateRoot,
+  onCreateChild,
+}) {
   const parentMap = new Map(graph.nodes.map((node) => [node.id, []]));
   const childMap = new Map(graph.nodes.map((node) => [node.id, []]));
   graph.dependencies.forEach((edge) => {
@@ -108,7 +146,9 @@ export function TaskListSurface({ graph, nodesById, selectedId, onSelectNode }) 
     parentMap.get(edge.childId).push(edge.parentId);
     childMap.get(edge.parentId).push(edge.childId);
   });
-  const roots = graph.nodes.filter((node) => (parentMap.get(node.id) || []).length === 0);
+  const roots = graph.nodes
+    .filter((node) => (parentMap.get(node.id) || []).length === 0)
+    .sort((left, right) => left.title.localeCompare(right.title));
 
   return (
     <div className="surface-content task-list-surface">
@@ -116,6 +156,11 @@ export function TaskListSurface({ graph, nodesById, selectedId, onSelectNode }) 
         <div>
           <p className="eyebrow">TASKS</p>
           <h2>Dependency list</h2>
+        </div>
+        <div className="surface-actions">
+          <button type="button" className="ghost-button" onClick={onCreateRoot}>
+            ADD ROOT
+          </button>
         </div>
       </div>
       <div className="task-list-grid">
@@ -129,6 +174,7 @@ export function TaskListSurface({ graph, nodesById, selectedId, onSelectNode }) 
             depth={0}
             selectedId={selectedId}
             onSelectNode={onSelectNode}
+            onCreateChild={onCreateChild}
           />
         ))}
       </div>
@@ -185,6 +231,7 @@ export function CalendarSurface({
   onPrev,
   onNext,
   onToday,
+  onRangeChange,
   onReconcile,
   reconciling,
   status,
@@ -206,6 +253,15 @@ export function CalendarSurface({
           <h2>{formatDayLabel(anchorDate, { month: "long", year: "numeric" })}</h2>
         </div>
         <div className="surface-actions">
+          <button type="button" className={`ghost-button ${range === "day" ? "active" : ""}`} onClick={() => onRangeChange("day")}>
+            DAY
+          </button>
+          <button type="button" className={`ghost-button ${range === "week" ? "active" : ""}`} onClick={() => onRangeChange("week")}>
+            WEEK
+          </button>
+          <button type="button" className={`ghost-button ${range === "month" ? "active" : ""}`} onClick={() => onRangeChange("month")}>
+            MONTH
+          </button>
           <button type="button" className="ghost-button" onClick={onPrev}>
             PREV
           </button>
@@ -269,3 +325,4 @@ export function CalendarSurface({
     </div>
   );
 }
+import { useState } from "react";

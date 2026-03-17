@@ -7,7 +7,6 @@ import {
   collectDescendants,
   computeGraphLayout,
   createNodeId,
-  deriveScheduleEdges,
   fibonacciSphere,
   formatHours,
   rotateX,
@@ -23,6 +22,7 @@ const TOPBAR_MESSAGES = [
 ];
 const SEARCH_PLACEHOLDER = "search:activity";
 const EMPTY_GRAPH = { nodes: [], dependencies: [], schedules: [] };
+const DEFAULT_VIEWPORT_STATE = getDefaultViewport({ width: 1200, height: 760 });
 
 function getLevelNoise(level, sessionSeed) {
   const base = Math.sin(sessionSeed * 97.13 + level * 53.71) * 43758.5453;
@@ -369,7 +369,17 @@ function buildClockwiseArcPath(from, to, options) {
   }
   const steps = Math.max(10, Math.ceil(delta / (Math.PI / 18)));
   const arcRatio = Math.min(0.98, Math.max(from.radialRatio, to.radialRatio) + 0.045);
-  let path = `M ${from.x} ${from.y}`;
+  const startPoint = projectLevelPoint({
+    angle: from.angle,
+    radialRatio: arcRatio,
+    centerX: options.centerX,
+    centerY: options.centerY,
+    radius: options.radius,
+    viewMode: options.viewMode,
+    rotationX: options.rotationX,
+    rotationY: options.rotationY,
+  });
+  let path = `M ${startPoint.x} ${startPoint.y}`;
 
   for (let index = 1; index <= steps; index += 1) {
     const angle = from.angle + (delta * index) / steps;
@@ -410,6 +420,33 @@ function RingsIcon() {
       />
       <path d="M8.9 4.1v13.6" className="icon-map-line" />
       <path d="M15.1 6.2v13.6" className="icon-map-line" />
+    </svg>
+  );
+}
+
+function ListIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M8 7h10" className="icon-map-line" />
+      <path d="M8 12h10" className="icon-map-line" />
+      <path d="M8 17h10" className="icon-map-line" />
+      <circle cx="5.2" cy="7" r="1.1" className="icon-globe-outline" />
+      <circle cx="5.2" cy="12" r="1.1" className="icon-globe-outline" />
+      <circle cx="5.2" cy="17" r="1.1" className="icon-globe-outline" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 6.2h14v12.4H5z" className="icon-map-outline" />
+      <path d="M8 4.6v3.2" className="icon-map-line" />
+      <path d="M16 4.6v3.2" className="icon-map-line" />
+      <path d="M5 9.3h14" className="icon-map-line" />
+      <path d="M8.2 12.2h2.3" className="icon-map-line" />
+      <path d="M13.5 12.2h2.3" className="icon-map-line" />
+      <path d="M8.2 16h2.3" className="icon-map-line" />
     </svg>
   );
 }
@@ -502,16 +539,50 @@ function cloneGraph(graph) {
   return JSON.parse(JSON.stringify(graph));
 }
 
+function normalizeSchedules(schedules, nodes, baseLevels) {
+  if (!Array.isArray(schedules)) {
+    return [];
+  }
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const seen = new Set();
+  return schedules.filter((rule) => {
+    if (!rule?.earlierId || !rule?.laterId) {
+      return false;
+    }
+    if (!nodeIds.has(rule.earlierId) || !nodeIds.has(rule.laterId)) {
+      return false;
+    }
+    if (baseLevels.get(rule.earlierId) !== baseLevels.get(rule.laterId)) {
+      return false;
+    }
+    const key = `${rule.earlierId}~>${rule.laterId}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 function sanitizeGraph(graph) {
   const nextGraph = cloneGraph(graph);
-  nextGraph.schedules = deriveScheduleEdges(nextGraph.nodes, nextGraph.dependencies);
   const layout = computeGraphLayout({
     nodes: nextGraph.nodes,
     dependencies: nextGraph.dependencies,
-    schedules: nextGraph.schedules,
+    schedules: [],
   });
-  nextGraph.schedules = deriveScheduleEdges(nextGraph.nodes, nextGraph.dependencies);
+  nextGraph.schedules = normalizeSchedules(nextGraph.schedules, nextGraph.nodes, layout.baseLevels);
   return nextGraph;
+}
+
+function getDefaultViewport(size) {
+  return {
+    zoom: 1.08,
+    panOffset: {
+      x: Math.round(size.width * -0.14),
+      y: Math.round(size.height * -0.08),
+    },
+  };
 }
 
 function replaceNode(graph, nodeId, updater) {
@@ -910,10 +981,13 @@ export default function App() {
   const urlInputRef = useRef(null);
   const browseInputRef = useRef(null);
   const dockRef = useRef(null);
+  const viewportInitializedRef = useRef(false);
   const dragRef = useRef({ active: false, mode: null, x: 0, y: 0, angle: 0 });
   const transitionTimersRef = useRef([]);
   const modeMorphFrameRef = useRef(0);
   const viewportTweenFrameRef = useRef(0);
+  const surfaceCloseTimerRef = useRef(0);
+  const pendingSurfaceActionRef = useRef(null);
   const levelSeedRef = useRef(Math.random() * 10000);
   const apiOptions = useMemo(
     () => ({
@@ -976,13 +1050,14 @@ export default function App() {
   const [graph, setGraph] = useState(() => sanitizeGraph(EMPTY_GRAPH));
   const [transition, setTransition] = useState(null);
   const [modeMorph, setModeMorph] = useState(null);
+  const [surfaceClosingMode, setSurfaceClosingMode] = useState(null);
   const [size, setSize] = useState({ width: 1200, height: 760 });
   const [autoRotation, setAutoRotation] = useState(0);
   const [rotationX, setRotationX] = useState(0.52);
   const [rotationY, setRotationY] = useState(0);
   const [rotation2D, setRotation2D] = useState(0);
-  const [zoom, setZoom] = useState(1);
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(DEFAULT_VIEWPORT_STATE.zoom);
+  const [panOffset, setPanOffset] = useState(DEFAULT_VIEWPORT_STATE.panOffset);
   const [isDragging, setIsDragging] = useState(false);
   const [isPointerDown, setIsPointerDown] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
@@ -990,6 +1065,7 @@ export default function App() {
   const [messageVisible, setMessageVisible] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [isModeMenuExpanded, setIsModeMenuExpanded] = useState(false);
   const [searchState, setSearchState] = useState("idle");
   const [nodesVisible, setNodesVisible] = useState(true);
   const [contextMenu, setContextMenu] = useState(null);
@@ -1013,6 +1089,9 @@ export default function App() {
   const isTransitioning = transition != null;
   const isMorphing = modeMorph != null;
   const displayViewMode = modeMorph ? modeMorph.to : viewMode;
+  const defaultViewport = useMemo(() => getDefaultViewport(size), [size]);
+  const displayedSurfaceMode = surfaceClosingMode || (surfaceMode !== "graph" ? surfaceMode : null);
+  const surfaceOverlayVisible = surfaceMode !== "graph" && !surfaceClosingMode;
   const levelSeed = levelSeedRef.current;
 
   function clearTransitionTimers() {
@@ -1024,6 +1103,13 @@ export default function App() {
     if (viewportTweenFrameRef.current) {
       cancelAnimationFrame(viewportTweenFrameRef.current);
       viewportTweenFrameRef.current = 0;
+    }
+  }
+
+  function clearSurfaceCloseTimer() {
+    if (surfaceCloseTimerRef.current) {
+      window.clearTimeout(surfaceCloseTimerRef.current);
+      surfaceCloseTimerRef.current = 0;
     }
   }
 
@@ -1060,9 +1146,19 @@ export default function App() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (viewportInitializedRef.current) {
+      return;
+    }
+    viewportInitializedRef.current = true;
+    setZoom(defaultViewport.zoom);
+    setPanOffset(defaultViewport.panOffset);
+  }, [defaultViewport]);
+
   useEffect(
     () => () => {
       clearTransitionTimers();
+      clearSurfaceCloseTimer();
       if (modeMorphFrameRef.current) {
         cancelAnimationFrame(modeMorphFrameRef.current);
       }
@@ -1074,7 +1170,7 @@ export default function App() {
   useEffect(() => {
     const shouldRotate3D =
       (!isMorphing && viewMode === "3d") || (isMorphing && modeMorph.to === "3d");
-    if (surfaceMode !== "graph" || workingId || !shouldRotate3D || isPointerDown) {
+    if (workingId || !shouldRotate3D || isPointerDown) {
       return undefined;
     }
     let frame = 0;
@@ -1090,10 +1186,10 @@ export default function App() {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [isMorphing, isPointerDown, modeMorph?.to, surfaceMode, viewMode, workingId]);
+  }, [isMorphing, isPointerDown, modeMorph?.to, viewMode, workingId]);
 
   useEffect(() => {
-    if (surfaceMode !== "graph" || workingId || viewMode !== "2d" || isPointerDown || isMorphing) {
+    if (workingId || viewMode !== "2d" || isPointerDown || isMorphing) {
       return undefined;
     }
     let frame = 0;
@@ -1109,7 +1205,7 @@ export default function App() {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [isMorphing, isPointerDown, surfaceMode, viewMode, workingId]);
+  }, [isMorphing, isPointerDown, viewMode, workingId]);
 
   useEffect(
     () => () => {
@@ -1896,28 +1992,68 @@ export default function App() {
     setIsPointerDown(false);
   }
 
-  function switchViewMode(nextMode) {
-    if (surfaceMode !== "graph") {
-      setSurfaceMode("graph");
-      if (nextMode === viewMode) {
-        return;
+  function closeSurfaceOverlay(afterClose = null) {
+    clearSurfaceCloseTimer();
+    if (surfaceMode === "graph" && !surfaceClosingMode) {
+      if (afterClose) {
+        afterClose();
       }
+      return;
     }
+    const closingMode = surfaceMode !== "graph" ? surfaceMode : surfaceClosingMode;
+    if (!closingMode) {
+      if (afterClose) {
+        afterClose();
+      }
+      return;
+    }
+    pendingSurfaceActionRef.current = afterClose;
+    setSurfaceClosingMode(closingMode);
+    setSurfaceMode("graph");
+    surfaceCloseTimerRef.current = window.setTimeout(() => {
+      setSurfaceClosingMode(null);
+      surfaceCloseTimerRef.current = 0;
+      const callback = pendingSurfaceActionRef.current;
+      pendingSurfaceActionRef.current = null;
+      if (callback) {
+        callback();
+      }
+    }, 240);
+  }
+
+  function performGraphModeSwitch(nextMode) {
     if (nextMode === viewMode || isMorphing) {
       return;
     }
     setModeMorph({ from: viewMode, to: nextMode, progress: 0 });
   }
 
+  function switchViewMode(nextMode) {
+    setIsModeMenuExpanded(false);
+    if (surfaceMode !== "graph" || surfaceClosingMode) {
+      closeSurfaceOverlay(() => performGraphModeSwitch(nextMode));
+      return;
+    }
+    performGraphModeSwitch(nextMode);
+  }
+
   function openListSurface() {
+    clearSurfaceCloseTimer();
+    pendingSurfaceActionRef.current = null;
+    setSurfaceClosingMode(null);
     setSurfaceMode("list");
     setContextMenu(null);
+    setIsModeMenuExpanded(false);
   }
 
   function openCalendarSurface(nextRange = calendarRange) {
+    clearSurfaceCloseTimer();
+    pendingSurfaceActionRef.current = null;
+    setSurfaceClosingMode(null);
     setSurfaceMode("calendar");
     setCalendarRange(nextRange);
     setContextMenu(null);
+    setIsModeMenuExpanded(false);
   }
 
   function onWheel(event) {
@@ -2037,14 +2173,14 @@ export default function App() {
   }
 
   function recenterView() {
-    animateViewport({ panOffset: { x: 0, y: 0 } });
+    animateViewport({ panOffset: defaultViewport.panOffset });
   }
 
   function focusPanel() {
     animateViewport({
       panOffset: {
-        x: Math.round(size.width * 0.17),
-        y: 0,
+        x: defaultViewport.panOffset.x + Math.round(size.width * 0.17),
+        y: defaultViewport.panOffset.y,
       },
     });
   }
@@ -2274,6 +2410,24 @@ export default function App() {
           workStartedAt: null,
         });
       }, () => createActivity(payload));
+      closeSheet();
+      return;
+    }
+
+    if (sheet?.type === "create-child" && sheet.parentId) {
+      startStructuralTransition("create", (draft) => {
+        const id = createNodeId(payload.title, draft.nodes);
+        draft.nodes.push({
+          id,
+          ...payload,
+          workStartedAt: null,
+        });
+        draft.dependencies.push({ parentId: sheet.parentId, childId: id });
+      }, () =>
+        createActivity({
+          ...payload,
+          parentIds: [sheet.parentId],
+        }));
       closeSheet();
       return;
     }
@@ -2556,6 +2710,20 @@ export default function App() {
     );
   }
 
+  function openCreateChildSheet(parentId) {
+    const parent = nodesById.get(parentId);
+    if (!parent) {
+      return;
+    }
+    openSheet(
+      { type: "create-child", parentId },
+      {
+        ...defaultForm(null),
+        notes: `Child of ${parent.title}.`,
+      },
+    );
+  }
+
   function submitAddDependencyActivity(event) {
     event.preventDefault();
     const payload = {
@@ -2608,6 +2776,7 @@ export default function App() {
       onClick={() => {
         setContextMenu(null);
         setIsImportMenuExpanded(false);
+        setIsModeMenuExpanded(false);
       }}
     >
       <header className="topbar">
@@ -2650,67 +2819,55 @@ export default function App() {
             ) : null}
           </div>
         </div>
-        <button
-          type="button"
-          className={`dock-button ${surfaceMode === "graph" && viewMode === "2d" ? "active" : ""}`}
-          onClick={() => switchViewMode("2d")}
-          aria-label="Show 2D graph"
-          title="2D view"
-        >
-          <RingsIcon />
-        </button>
-        <button
-          type="button"
-          className={`dock-button ${surfaceMode === "graph" && viewMode === "3d" ? "active" : ""}`}
-          onClick={() => switchViewMode("3d")}
-          aria-label="Show 3D graph"
-          title="3D view"
-        >
-          <GlobeIcon />
-        </button>
-        <button
-          type="button"
-          className={`dock-button ${surfaceMode === "list" ? "active" : ""}`}
-          onClick={openListSurface}
-          aria-label="Show task list"
-          title="List view"
-        >
-          <span className="dock-glyph">L</span>
-        </button>
-        <div className={`dock-calendar ${surfaceMode === "calendar" ? "expanded" : ""}`}>
+        <div className={`dock-mode ${isModeMenuExpanded ? "expanded" : ""}`}>
           <button
             type="button"
-            className={`dock-button ${surfaceMode === "calendar" ? "active" : ""}`}
-            onClick={() => openCalendarSurface()}
-            aria-label="Show calendar"
-            title="Calendar view"
+            className={`dock-button ${isModeMenuExpanded || displayedSurfaceMode ? "active" : ""}`}
+            onClick={() => {
+              setIsImportMenuExpanded(false);
+              setIsModeMenuExpanded((value) => !value);
+            }}
+            aria-label="Choose view mode"
+            title="Choose view mode"
           >
-            <span className="dock-glyph">C</span>
+            <CalendarIcon />
           </button>
-          <div className="dock-calendar-actions" aria-hidden={surfaceMode !== "calendar"}>
+          <div className="dock-mode-actions" aria-hidden={!isModeMenuExpanded}>
             <button
               type="button"
-              className={`dock-subaction dock-subicon ${calendarRange === "day" ? "active" : ""}`}
-              onClick={() => openCalendarSurface("day")}
-              title="Daily calendar"
+              className={`dock-subaction ${surfaceMode === "graph" && viewMode === "2d" ? "active" : ""}`}
+              onClick={() => switchViewMode("2d")}
+              title="2D view"
             >
-              <span>D</span>
+              <RingsIcon />
+              <span>2D</span>
             </button>
             <button
               type="button"
-              className={`dock-subaction dock-subicon ${calendarRange === "week" ? "active" : ""}`}
-              onClick={() => openCalendarSurface("week")}
-              title="Weekly calendar"
+              className={`dock-subaction ${surfaceMode === "graph" && viewMode === "3d" ? "active" : ""}`}
+              onClick={() => switchViewMode("3d")}
+              title="3D view"
             >
-              <span>W</span>
+              <GlobeIcon />
+              <span>3D</span>
             </button>
             <button
               type="button"
-              className={`dock-subaction dock-subicon ${calendarRange === "month" ? "active" : ""}`}
-              onClick={() => openCalendarSurface("month")}
-              title="Monthly calendar"
+              className={`dock-subaction ${surfaceMode === "list" ? "active" : ""}`}
+              onClick={openListSurface}
+              title="List view"
             >
-              <span>M</span>
+              <ListIcon />
+              <span>List</span>
+            </button>
+            <button
+              type="button"
+              className={`dock-subaction ${surfaceMode === "calendar" ? "active" : ""}`}
+              onClick={() => openCalendarSurface()}
+              title="Calendar view"
+            >
+              <CalendarIcon />
+              <span>Calendar</span>
             </button>
           </div>
         </div>
@@ -2790,12 +2947,12 @@ export default function App() {
         >
           <ChatIcon />
         </button>
-        {Math.abs(zoom - 1) > 0.001 ? (
+        {Math.abs(zoom - defaultViewport.zoom) > 0.001 ? (
           <button
             type="button"
             className="dock-button dock-button-text"
             onClick={() => {
-              animateViewport({ zoom: 1 });
+              animateViewport({ zoom: defaultViewport.zoom });
             }}
             aria-label="Reset zoom to 100%"
             title="100%"
@@ -2803,7 +2960,8 @@ export default function App() {
             100%
           </button>
         ) : null}
-        {Math.abs(panOffset.x) > 0.5 || Math.abs(panOffset.y) > 0.5 ? (
+        {Math.abs(panOffset.x - defaultViewport.panOffset.x) > 0.5 ||
+        Math.abs(panOffset.y - defaultViewport.panOffset.y) > 0.5 ? (
           <button
             type="button"
             className="dock-button"
@@ -2950,10 +3108,9 @@ export default function App() {
         </div>
       )}
 
-      {surfaceMode === "graph" ? (
       <section
         ref={shellRef}
-        className={`sphere-area view-${displayViewMode} ${isDragging ? "dragging" : ""} ${searchState} ${leftPanel ? "panel-open" : ""}`}
+        className={`sphere-area view-${displayViewMode} ${isDragging ? "dragging" : ""} ${searchState} ${leftPanel ? "panel-open" : ""} ${displayedSurfaceMode ? "surface-open" : ""}`}
         aria-label="Activity dependency network"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -3336,42 +3493,49 @@ export default function App() {
           </g>
         </svg>
       </section>
-      ) : surfaceMode === "list" ? (
-        <section
-          ref={shellRef}
-          className={`sphere-area surface-shell ${leftPanel ? "panel-open" : ""}`}
-          aria-label="Task list"
+      {displayedSurfaceMode ? (
+        <div
+          className={`surface-overlay ${surfaceOverlayVisible ? "visible" : "closing"}`}
+          aria-hidden={!surfaceOverlayVisible}
         >
-          <TaskListSurface
-            graph={graph}
-            nodesById={nodesById}
-            selectedId={selectedId}
-            onSelectNode={toggleSelectedNode}
-          />
-        </section>
-      ) : (
-        <section
-          ref={shellRef}
-          className={`sphere-area surface-shell ${leftPanel ? "panel-open" : ""}`}
-          aria-label="Calendar"
-        >
-          <CalendarSurface
-            range={calendarRange}
-            anchorDate={calendarAnchorDate}
-            onPrev={() => setCalendarAnchorDate((value) => shiftCalendarAnchor(calendarRange, value, -1))}
-            onNext={() => setCalendarAnchorDate((value) => shiftCalendarAnchor(calendarRange, value, 1))}
-            onToday={() => setCalendarAnchorDate(new Date())}
-            onReconcile={() => void reconcileAppleCalendar(calendarQueryRange)}
-            reconciling={calendarReconciling}
-            status={appleCalendarStatus}
-            loading={calendarLoading}
-            events={appleCalendarEvents}
-            onSelectActivity={toggleSelectedNode}
-          />
-        </section>
-      )}
+          <section
+            className={`surface-shell ${displayedSurfaceMode === "calendar" ? "calendar-shell" : "list-shell"}`}
+            aria-label={displayedSurfaceMode === "calendar" ? "Calendar" : "Task list"}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {displayedSurfaceMode === "list" ? (
+              <TaskListSurface
+                graph={graph}
+                nodesById={nodesById}
+                selectedId={selectedId}
+                onSelectNode={toggleSelectedNode}
+                onCreateRoot={() => {
+                  setIsModeMenuExpanded(false);
+                  openSheet({ type: "create" }, defaultForm(null));
+                }}
+                onCreateChild={openCreateChildSheet}
+              />
+            ) : (
+              <CalendarSurface
+                range={calendarRange}
+                anchorDate={calendarAnchorDate}
+                onPrev={() => setCalendarAnchorDate((value) => shiftCalendarAnchor(calendarRange, value, -1))}
+                onNext={() => setCalendarAnchorDate((value) => shiftCalendarAnchor(calendarRange, value, 1))}
+                onToday={() => setCalendarAnchorDate(new Date())}
+                onRangeChange={setCalendarRange}
+                onReconcile={() => void reconcileAppleCalendar(calendarQueryRange)}
+                reconciling={calendarReconciling}
+                status={appleCalendarStatus}
+                loading={calendarLoading}
+                events={appleCalendarEvents}
+                onSelectActivity={toggleSelectedNode}
+              />
+            )}
+          </section>
+        </div>
+      ) : null}
 
-      {surfaceMode === "graph" && contextMenu && (
+      {!displayedSurfaceMode && contextMenu && (
         <div
           className="context-menu"
           style={{ left: contextMenu.x, top: contextMenu.y }}
@@ -3421,7 +3585,7 @@ export default function App() {
               >
                 Edit date
               </button>
-              <p className="small">Derived from nodes sharing the same start date.</p>
+              <p className="small">Scheduling edge between activities on the same dependency level.</p>
             </>
           ) : (
             <>
@@ -3498,7 +3662,7 @@ export default function App() {
         </div>
       )}
 
-      {selected && selectedDetails && selected.kind !== "note" && (
+      {!displayedSurfaceMode && selected && selectedDetails && selected.kind !== "note" && (
         <aside className="details-modal details-sidepanel">
           <div className="details-header">
             <div>
@@ -3575,11 +3739,13 @@ export default function App() {
       {sheet && (
         <div className="sheet-backdrop" onPointerDown={closeSheet}>
           <aside className="sheet" onPointerDown={(event) => event.stopPropagation()}>
-            {(sheet.type === "create" || sheet.type === "edit" || sheet.type === "insert-between") && (
+            {(sheet.type === "create" || sheet.type === "create-child" || sheet.type === "edit" || sheet.type === "insert-between") && (
               <>
                 <h2>
                   {sheet.type === "create"
                     ? "Create activity"
+                    : sheet.type === "create-child"
+                      ? "Create child activity"
                     : sheet.type === "insert-between"
                       ? "Insert activity between edge"
                       : "Edit activity"}

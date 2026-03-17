@@ -198,14 +198,63 @@
   cursor: default;
 }
 
+.sphere-area.surface-open {
+  pointer-events: none;
+}
+
+.surface-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: 4.2rem 1.35rem 1.35rem;
+  background: rgb(2 7 18 / 22%);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms ease, background-color 240ms ease;
+}
+
+.surface-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.surface-overlay.closing {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .surface-shell {
   cursor: default;
   overflow: auto;
+  width: min(48rem, calc(100vw - 7.4rem));
+  max-height: min(78vh, calc(100vh - 5.8rem));
+  border-radius: 0.8rem;
+  border: 1px solid #8cb4ff20;
+  background: #09182cd6;
+  box-shadow: 0 18px 54px #00081d78;
+  backdrop-filter: blur(10px);
+  transform: translateY(14px) scale(0.985);
+  transition: transform 240ms ease, opacity 240ms ease;
+}
+
+.surface-shell.list-shell {
+  width: min(42rem, calc(100vw - 7.4rem));
+}
+
+.surface-shell.calendar-shell {
+  width: min(72rem, calc(100vw - 7.4rem));
+}
+
+.surface-overlay.visible .surface-shell {
+  transform: translateY(0) scale(1);
 }
 
 .surface-content {
   min-height: 100%;
-  padding: 5rem 1.4rem 1.4rem;
+  padding: 1.2rem 1.2rem 1.1rem;
 }
 
 .surface-header {
@@ -282,10 +331,10 @@
 
 .control-dock {
   position: absolute;
-  left: min(calc(100vw - 3.6rem), calc(50% + min(28vw, 14rem)));
+  left: min(calc(100vw - 3.7rem), calc(50% + min(34vw, 18.5rem)));
   top: 50%;
   transform: translateY(-50%);
-  z-index: 10;
+  z-index: 14;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -301,7 +350,7 @@
   gap: 0.42rem;
 }
 
-.dock-calendar {
+.dock-mode {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -329,7 +378,7 @@
   transform: translateY(-50%) scale(1);
 }
 
-.dock-calendar-actions {
+.dock-mode-actions {
   position: absolute;
   right: calc(100% + 0.55rem);
   top: 50%;
@@ -343,7 +392,7 @@
     transform 180ms ease;
 }
 
-.dock-calendar.expanded .dock-calendar-actions {
+.dock-mode.expanded .dock-mode-actions {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(-50%) scale(1);
@@ -399,17 +448,6 @@
   font-size: 0.68rem;
 }
 
-.dock-subicon {
-  min-width: 2.1rem;
-  width: 2.1rem;
-  padding: 0;
-}
-
-.dock-subicon.active {
-  border-color: #9fe8ff7a;
-  background: #153761f0;
-}
-
 .dock-subaction {
   min-width: 5.7rem;
   height: 2.1rem;
@@ -434,6 +472,12 @@
   transform: translateY(-1px);
   border-color: #9fe8ff5f;
   background: #102244f0;
+  box-shadow: 0 0 18px #6cd7ff22;
+}
+
+.dock-subaction.active {
+  border-color: #9fe8ff7a;
+  background: #153761f0;
   box-shadow: 0 0 18px #6cd7ff22;
 }
 
@@ -547,22 +591,61 @@
 .task-list-grid {
   display: grid;
   gap: 0.7rem;
-  max-width: min(56rem, calc(100vw - 2.8rem));
 }
 
 .task-branch {
+  display: grid;
+  grid-template-rows: auto 0fr;
   border: 1px solid #8cb4ff24;
   border-radius: 0.6rem;
-  background: #0b172cb5;
+  background: #0b172ca8;
   overflow: hidden;
+  transition: background-color 220ms ease, border-color 220ms ease, grid-template-rows 260ms ease;
+}
+
+.task-branch.open {
+  grid-template-rows: auto 1fr;
 }
 
 .task-summary {
-  list-style: none;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.18rem 0.2rem 0.18rem 0.25rem;
 }
 
-.task-summary::-webkit-details-marker {
-  display: none;
+.task-toggle,
+.task-inline-action {
+  width: 1.82rem;
+  height: 1.82rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #d5e8ff;
+  cursor: pointer;
+  transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.task-toggle:hover,
+.task-inline-action:hover {
+  background: #16325ab0;
+  color: #f3fbff;
+}
+
+.task-toggle-glyph {
+  width: 0.46rem;
+  height: 0.46rem;
+  border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 220ms ease;
+}
+
+.task-toggle.open .task-toggle-glyph {
+  transform: rotate(45deg);
 }
 
 .task-title-button {
@@ -582,6 +665,7 @@
 
 .task-summary.selected .task-title-button {
   background: #153761b3;
+  border-radius: 0.44rem;
 }
 
 .task-summary-meta {
@@ -590,16 +674,21 @@
   text-transform: uppercase;
 }
 
+.task-branch-collapse {
+  min-height: 0;
+  overflow: hidden;
+}
+
 .task-branch-body {
   display: grid;
   gap: 0.65rem;
-  padding: 0 0.9rem 0.9rem;
+  padding: 0 0.9rem 0.9rem 2.3rem;
 }
 
 .task-children {
   display: grid;
   gap: 0.6rem;
-  padding-left: 0.8rem;
+  padding-left: 0.7rem;
   border-left: 1px solid #8cb4ff1f;
 }
 
@@ -1333,6 +1422,12 @@ button.chip {
   height: 1.05rem;
 }
 
+.surface-actions .ghost-button.active {
+  border-color: #9fe8ff7a;
+  background: #153761f0;
+  box-shadow: 0 0 24px #6cd7ff20;
+}
+
 .context-menu {
   position: fixed;
   z-index: 14;
@@ -1609,7 +1704,7 @@ button.chip {
     transform: translateX(-50%) scale(1);
   }
 
-  .dock-calendar-actions {
+  .dock-mode-actions {
     right: auto;
     left: 50%;
     top: auto;
@@ -1617,7 +1712,7 @@ button.chip {
     transform: translateX(-50%) scale(0.96);
   }
 
-  .dock-calendar.expanded .dock-calendar-actions {
+  .dock-mode.expanded .dock-mode-actions {
     transform: translateX(-50%) scale(1);
   }
 
