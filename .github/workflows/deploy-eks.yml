@@ -1,31 +1,31 @@
 name: Deploy EKS
 
 on:
-  # Automatic deployment trigger on release and infra stack tags.
-  # GitHub tag filters use glob syntax; exact format is validated in the metadata step.
-  # Supported tags:
-  # - cdk-stack-eks-1.2.3-b.1             -> Development
-  # - cdk-stack-eks-1.2.3-a.1             -> Beta               [FORBIDDEN:Minerva]
-  # - cdk-stack-eks-1.2.3-rc.1            -> Release Candidate  [FORBIDDEN:Minerva]
-  # - cdk-stack-eks-1.2.3                 -> Production         [FORBIDDEN:Minerva]
   push:
     tags:
-      - 'cdk-stack-eks-*'
+      - "cdk-stack-eks-[0-9]*"
     paths:
-      - 'src/penroselamarck/infra/eks/**'
-      - 'src/penroselamarck/api/**'
-      - 'src/penroselamarck/db/**'
-      - 'src/penroselamarck/web/**'
-      - 'src/penroselamarck/alembic.ini'
-      - 'src/penroselamarck/alembic/**'
-      - 'src/penroselamarck/core/**'
-      - 'src/penroselamarck/models/**'
-      - 'src/penroselamarck/schemas/**'
-      - 'src/penroselamarck/repositories/**'
-      - 'src/penroselamarck/services/**'
-      - 'src/penroselamarck/__init__.py'
-      - 'docs/**'
-      - '.github/workflows/deploy-eks.yml'
+      - "src/move37/infra/eks/**"
+      - "src/move37/api/**"
+      - "src/move37/db/**"
+      - "src/move37/web/**"
+      - "src/move37/models/**"
+      - "src/move37/repositories/**"
+      - "src/move37/schemas/**"
+      - "src/move37/services/**"
+      - "src/move37/alembic.ini"
+      - "src/move37/alembic/**"
+      - "src/move37/otel/**"
+      - "src/move37/prometheus/**"
+      - "src/move37/loki/**"
+      - "src/move37/promtail/**"
+      - "src/move37/grafana/**"
+      - "src/move37/default_graph.py"
+      - "src/move37/bank_account.py"
+      - "src/move37/calendar.py"
+      - "src/move37/github.py"
+      - "src/move37/__init__.py"
+      - ".github/workflows/deploy-eks.yml"
   workflow_run:
     workflows:
       - Deploy Web Container
@@ -46,13 +46,16 @@ jobs:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     env:
-      VPC_ID: ${{ vars.VPC_ID }}
+      VPC_ID: ${{ secrets.VPC_ID }}
+      EKS_CLUSTER_SUBNET_IDS: ${{ vars.EKS_CLUSTER_SUBNET_IDS }}
       WEB_STANDALONE_DEBUG: ${{ vars.WEB_STANDALONE_DEBUG || 'false' }}
+      EKS_GHCR_PULL_USERNAME: ${{ secrets.EKS_GHCR_PULL_USERNAME }}
+      EKS_GHCR_PULL_TOKEN: ${{ secrets.EKS_GHCR_PULL_TOKEN }}
 
     defaults:
       run:
         shell: bash
-        working-directory: src/penroselamarck/infra/eks
+        working-directory: src/move37/infra/eks
 
     steps:
       - name: Checkout (Push Trigger)
@@ -70,7 +73,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: deploy-web-metadata
-          path: src/penroselamarck/infra/eks
+          path: src/move37/infra/eks
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -104,23 +107,23 @@ jobs:
             case "$TARGET_BRANCH" in
               dev)
                 DEPLOY_ENV="dev"
-                CLUSTER_NAME="penroselamarck-eks-dev"
-                NAMESPACE="penroselamarck-dev"
+                CLUSTER_NAME="move37-eks-dev"
+                NAMESPACE="move37-dev"
                 ;;
               beta)
                 DEPLOY_ENV="beta"
-                CLUSTER_NAME="penroselamarck-eks-beta"
-                NAMESPACE="penroselamarck-beta"
+                CLUSTER_NAME="move37-eks-beta"
+                NAMESPACE="move37-beta"
                 ;;
               rc)
                 DEPLOY_ENV="rc"
-                CLUSTER_NAME="penroselamarck-eks-rc"
-                NAMESPACE="penroselamarck-rc"
+                CLUSTER_NAME="move37-eks-rc"
+                NAMESPACE="move37-rc"
                 ;;
               latest)
                 DEPLOY_ENV="prod"
-                CLUSTER_NAME="penroselamarck-eks-prod"
-                NAMESPACE="penroselamarck-prod"
+                CLUSTER_NAME="move37-eks-prod"
+                NAMESPACE="move37-prod"
                 ;;
               *)
                 echo "Unsupported target_branch in metadata: $TARGET_BRANCH" >&2
@@ -129,11 +132,7 @@ jobs:
             esac
           else
             TAG="${GITHUB_REF_NAME}"
-            if [[ "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+(\.[0-9]+)?)?)$ ]]; then
-              TAG_KIND="release"
-              VERSION_SUFFIX="${BASH_REMATCH[1]}"
-              IMAGE_TAG="${VERSION_SUFFIX}"
-            elif [[ "$TAG" =~ ^cdk-stack-eks-([0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+(\.[0-9]+)?)?)$ ]]; then
+            if [[ "$TAG" =~ ^cdk-stack-eks-([0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+(\.[0-9]+)?)?)$ ]]; then
               TAG_KIND="infra"
               VERSION_SUFFIX="${BASH_REMATCH[1]}"
             else
@@ -141,22 +140,24 @@ jobs:
               exit 1
             fi
 
+            IMAGE_TAG="${VERSION_SUFFIX}"
+
             if [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+-b\.[0-9]+$ ]]; then
               DEPLOY_ENV="dev"
-              CLUSTER_NAME="penroselamarck-eks-dev"
-              NAMESPACE="penroselamarck-dev"
+              CLUSTER_NAME="move37-eks-dev"
+              NAMESPACE="move37-dev"
             elif [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+-a\.[0-9]+$ ]]; then
               DEPLOY_ENV="beta"
-              CLUSTER_NAME="penroselamarck-eks-beta"
-              NAMESPACE="penroselamarck-beta"
+              CLUSTER_NAME="move37-eks-beta"
+              NAMESPACE="move37-beta"
             elif [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
               DEPLOY_ENV="rc"
-              CLUSTER_NAME="penroselamarck-eks-rc"
-              NAMESPACE="penroselamarck-rc"
+              CLUSTER_NAME="move37-eks-rc"
+              NAMESPACE="move37-rc"
             elif [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               DEPLOY_ENV="prod"
-              CLUSTER_NAME="penroselamarck-eks-prod"
-              NAMESPACE="penroselamarck-prod"
+              CLUSTER_NAME="move37-eks-prod"
+              NAMESPACE="move37-prod"
             else
               echo "Unsupported version suffix in tag: $TAG" >&2
               exit 1
@@ -175,11 +176,11 @@ jobs:
         run: |
           set -euo pipefail
           if grep -qE '^eks:' stack-version.yaml; then
-            sed -E -i "s/^eks:.*/eks: ${{ steps.meta.outputs.stack_version }}/" stack-version.yaml
+            sed -E -i.bak "s/^eks:.*/eks: ${{ steps.meta.outputs.stack_version }}/" stack-version.yaml
+            rm -f stack-version.yaml.bak
           else
             echo "eks: ${{ steps.meta.outputs.stack_version }}" >> stack-version.yaml
           fi
-          echo "Using stack-version.yaml:"
           cat stack-version.yaml
 
       - name: Configure AWS credentials
@@ -188,15 +189,38 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION || 'eu-central-1' }}
 
-      - name: Validate VPC configuration
+      - name: Validate network configuration
         run: |
           set -euo pipefail
           if [[ -z "${VPC_ID:-}" ]]; then
-            echo "Missing repository variable VPC_ID. Set it to the existing VPC ID used by the EKS stack." >&2
+            echo "Missing repository secret VPC_ID." >&2
             exit 1
           fi
+          if [[ -z "${EKS_CLUSTER_SUBNET_IDS:-}" ]]; then
+            echo "Missing repository variable EKS_CLUSTER_SUBNET_IDS." >&2
+            exit 1
+          fi
+          mapfile -t subnet_ids < <(echo "${EKS_CLUSTER_SUBNET_IDS}" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed '/^$/d')
+          if [[ "${#subnet_ids[@]}" -lt 2 ]]; then
+            echo "EKS_CLUSTER_SUBNET_IDS must contain at least two subnet IDs." >&2
+            exit 1
+          fi
+          for subnet_id in "${subnet_ids[@]}"; do
+            if [[ ! "${subnet_id}" =~ ^subnet-[a-z0-9]+$ ]]; then
+              echo "Invalid subnet ID '${subnet_id}' in EKS_CLUSTER_SUBNET_IDS." >&2
+              exit 1
+            fi
+          done
           if [[ "${WEB_STANDALONE_DEBUG}" != "true" && "${WEB_STANDALONE_DEBUG}" != "false" ]]; then
-            echo "Invalid WEB_STANDALONE_DEBUG='${WEB_STANDALONE_DEBUG}'. Allowed values: true|false." >&2
+            echo "Invalid WEB_STANDALONE_DEBUG='${WEB_STANDALONE_DEBUG}'." >&2
+            exit 1
+          fi
+          if [[ -z "${EKS_GHCR_PULL_USERNAME:-}" ]]; then
+            echo "Missing repository secret EKS_GHCR_PULL_USERNAME." >&2
+            exit 1
+          fi
+          if [[ -z "${EKS_GHCR_PULL_TOKEN:-}" ]]; then
+            echo "Missing repository secret EKS_GHCR_PULL_TOKEN." >&2
             exit 1
           fi
 
@@ -205,30 +229,27 @@ jobs:
 
       - name: Deploy EKS stack
         env:
-          PENROSELAMARCK_DEPLOY_ENV: ${{ steps.meta.outputs.deploy_env }}
+          MOVE37_DEPLOY_ENV: ${{ steps.meta.outputs.deploy_env }}
         run: |
           set -euo pipefail
-          if [[ "${{ steps.meta.outputs.tag_kind }}" == "release" ]]; then
+          if [[ "${{ steps.meta.outputs.tag_kind }}" == "web-rollout" ]]; then
             npm run deploy -- \
-              PenroselamarckEksStack \
+              Move37EksStack \
               --require-approval never \
               --parameters Namespace="${{ steps.meta.outputs.namespace }}" \
               --parameters WebStandaloneDebug="${WEB_STANDALONE_DEBUG}" \
-              --parameters DocsImage="ghcr.io/${{ github.repository_owner }}/penrose-lamarck-docs:${{ steps.meta.outputs.image_tag }}" \
-              --parameters ApiImage="ghcr.io/${{ github.repository_owner }}/penrose-lamarck-api:${{ steps.meta.outputs.image_tag }}" \
-              --parameters WebImage="ghcr.io/${{ github.repository_owner }}/penrose-lamarck-web:${{ steps.meta.outputs.image_tag }}" \
-              --parameters DbImage="ghcr.io/${{ github.repository_owner }}/penrose-lamarck-pg:${{ steps.meta.outputs.image_tag }}"
-          elif [[ "${{ steps.meta.outputs.tag_kind }}" == "web-rollout" ]]; then
-            npm run deploy -- \
-              PenroselamarckEksStack \
-              --require-approval never \
-              --parameters Namespace="${{ steps.meta.outputs.namespace }}" \
-              --parameters WebStandaloneDebug="${WEB_STANDALONE_DEBUG}" \
-              --parameters WebImage="ghcr.io/${{ github.repository_owner }}/penrose-lamarck-web:${{ steps.meta.outputs.image_tag }}"
+              --parameters GhcrPullUsername="${EKS_GHCR_PULL_USERNAME}" \
+              --parameters GhcrPullToken="${EKS_GHCR_PULL_TOKEN}" \
+              --parameters WebImage="ghcr.io/${{ github.repository_owner }}/move37-web:${{ steps.meta.outputs.image_tag }}"
           else
             npm run deploy -- \
-              PenroselamarckEksStack \
+              Move37EksStack \
               --require-approval never \
               --parameters Namespace="${{ steps.meta.outputs.namespace }}" \
-              --parameters WebStandaloneDebug="${WEB_STANDALONE_DEBUG}"
+              --parameters WebStandaloneDebug="${WEB_STANDALONE_DEBUG}" \
+              --parameters GhcrPullUsername="${EKS_GHCR_PULL_USERNAME}" \
+              --parameters GhcrPullToken="${EKS_GHCR_PULL_TOKEN}" \
+              --parameters ApiImage="ghcr.io/${{ github.repository_owner }}/move37-api:${{ steps.meta.outputs.image_tag }}" \
+              --parameters WebImage="ghcr.io/${{ github.repository_owner }}/move37-web:${{ steps.meta.outputs.image_tag }}" \
+              --parameters DbImage="ghcr.io/${{ github.repository_owner }}/move37-db:${{ steps.meta.outputs.image_tag }}"
           fi

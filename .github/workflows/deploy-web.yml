@@ -1,20 +1,12 @@
 name: Deploy Web Container
 
 on:
-  # Automatic deployment trigger on version tags.
-  # GitHub tag filters use glob syntax; exact format is validated in the metadata step.
-  # Tag formats determine target environment:
-  # - v1.2.3-b.1  -> Development (branch builds)
-  # - v1.2.3-a.1  -> Beta (alpha releases)
-  # - v1.2.3-rc.1 -> Release Candidate
-  # - v1.2.3      -> Stable/Production
   push:
     tags:
-      - 'v*'
+      - "v*"
     paths:
-      - 'src/penroselamarck/web/**'
-      - 'src/penroselamarck/sdk/ts/**'
-      - '.github/workflows/deploy-web.yml'
+      - "src/move37/web/**"
+      - ".github/workflows/deploy-web.yml"
 
 permissions:
   contents: read
@@ -52,9 +44,9 @@ jobs:
             exit 1
           fi
 
-          TAGS="ghcr.io/${{ github.repository_owner }}/penrose-lamarck-web:${IMAGE_TAG}"
+          TAGS="ghcr.io/${{ github.repository_owner }}/move37-web:${IMAGE_TAG}"
           if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            TAGS="${TAGS}"$'\n'"ghcr.io/${{ github.repository_owner }}/penrose-lamarck-web:latest"
+            TAGS="${TAGS}"$'\n'"ghcr.io/${{ github.repository_owner }}/move37-web:latest"
           fi
 
           echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
@@ -98,13 +90,9 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: src/penroselamarck/web/Dockerfile
+          file: src/move37/web/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           build-args: |
             VERSION=${{ steps.meta.outputs.image_tag }}
             VCS_REF=${{ github.sha }}
-            WEB_SDK_SOURCE=registry
-            WEB_SDK_VERSION=${{ steps.meta.outputs.image_tag }}
-            GITHUB_NPM_OWNER=${{ github.repository_owner }}
-            GITHUB_NPM_TOKEN=${{ secrets.GITHUB_TOKEN }}

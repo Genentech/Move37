@@ -1,19 +1,19 @@
-name: Deploy OIDC Bootstrap
+name: Deploy EKS Access Role
 
 on:
   push:
     tags:
-      - "cdk-stack-oidc-*"
+      - "cdk-stack-eks-access-*"
     paths:
       - "src/move37/infra/eks/**"
-      - ".github/workflows/deploy-oidc-bootstrap.yml"
+      - ".github/workflows/deploy-eks-access-role.yml"
 
 permissions:
   contents: read
   id-token: write
 
 concurrency:
-  group: deploy-oidc-${{ github.ref }}
+  group: deploy-eks-access-role-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -40,8 +40,10 @@ jobs:
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
           VERSION_SUFFIX=""
+          DEPLOY_ENV=""
+          CLUSTER_NAME=""
 
-          if [[ "$TAG" =~ ^cdk-stack-oidc-([0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+(\.[0-9]+)?)?)$ ]]; then
+          if [[ "$TAG" =~ ^cdk-stack-eks-access-([0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+(\.[0-9]+)?)?)$ ]]; then
             VERSION_SUFFIX="${BASH_REMATCH[1]}"
           else
             echo "Unsupported tag format: $TAG" >&2
@@ -50,12 +52,16 @@ jobs:
 
           if [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+-b\.[0-9]+$ ]]; then
             DEPLOY_ENV="dev"
+            CLUSTER_NAME="move37-eks-dev"
           elif [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+-a\.[0-9]+$ ]]; then
             DEPLOY_ENV="beta"
+            CLUSTER_NAME="move37-eks-beta"
           elif [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
             DEPLOY_ENV="rc"
+            CLUSTER_NAME="move37-eks-rc"
           elif [[ "$VERSION_SUFFIX" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             DEPLOY_ENV="prod"
+            CLUSTER_NAME="move37-eks-prod"
           else
             echo "Unsupported version suffix in tag: $TAG" >&2
             exit 1
@@ -63,15 +69,16 @@ jobs:
 
           echo "stack_version=$VERSION_SUFFIX" >> "$GITHUB_OUTPUT"
           echo "deploy_env=$DEPLOY_ENV" >> "$GITHUB_OUTPUT"
+          echo "cluster_name=$CLUSTER_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Apply stack version from tag
         run: |
           set -euo pipefail
-          if grep -qE '^oidc:' stack-version.yaml; then
-            sed -E -i.bak "s/^oidc:.*/oidc: ${{ steps.meta.outputs.stack_version }}/" stack-version.yaml
+          if grep -qE '^access:' stack-version.yaml; then
+            sed -E -i.bak "s/^access:.*/access: ${{ steps.meta.outputs.stack_version }}/" stack-version.yaml
             rm -f stack-version.yaml.bak
           else
-            echo "oidc: ${{ steps.meta.outputs.stack_version }}" >> stack-version.yaml
+            echo "access: ${{ steps.meta.outputs.stack_version }}" >> stack-version.yaml
           fi
           cat stack-version.yaml
 
@@ -84,7 +91,10 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Deploy OIDC bootstrap stack
+      - name: Deploy EKS access role stack
         env:
           MOVE37_DEPLOY_ENV: ${{ steps.meta.outputs.deploy_env }}
-        run: npm run deploy:oidc-bootstrap
+        run: |
+          set -euo pipefail
+          npm run deploy:eks-access -- \
+            --parameters ClusterName="${{ steps.meta.outputs.cluster_name }}"

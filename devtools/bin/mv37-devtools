@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+IMAGE_TAG="${MV37_DEVTOOLS_IMAGE:-mv37-devtools:local}"
+DEFAULT_CONFIG="${MV37_DEVTOOLS_DEFAULT_CONFIG:-devtools/config/move37.repo.toml}"
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "docker is required to run mv37-devtools" >&2
+  exit 1
+fi
+
+if ! command -v gh >/dev/null 2>&1; then
+  echo "gh is required to run mv37-devtools" >&2
+  exit 1
+fi
+
+if ! gh auth status >/dev/null 2>&1; then
+  echo "gh auth is required to run mv37-devtools" >&2
+  exit 1
+fi
+
+GITHUB_TOKEN="$(gh auth token)"
+if [ -z "${GITHUB_TOKEN}" ]; then
+  echo "gh auth token returned an empty token" >&2
+  exit 1
+fi
+
+if [ "${MV37_DEVTOOLS_REBUILD:-0}" = "1" ] || ! docker image inspect "${IMAGE_TAG}" >/dev/null 2>&1; then
+  docker build -t "${IMAGE_TAG}" -f "${REPO_ROOT}/devtools/Dockerfile" "${REPO_ROOT}"
+fi
+
+if [ "$#" -eq 0 ]; then
+  set -- bootstrap plan
+fi
+
+docker run --rm \
+  -e GITHUB_TOKEN="${GITHUB_TOKEN}" \
+  -e MV37_DEVTOOLS_DEFAULT_CONFIG="${DEFAULT_CONFIG}" \
+  -v "${REPO_ROOT}:/workspace" \
+  -w /workspace \
+  "${IMAGE_TAG}" \
+  "$@"

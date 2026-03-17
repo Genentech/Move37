@@ -1,12 +1,12 @@
 # create the network before building the devcontainer
-# docker network create penroselamarck-network
+# docker network create move37-network
 #
 # build base, tools and devcontainer images (don't pull, they don't exist on first run)
 # docker compose -f .devcontainer/compose.yml build base
 # docker compose -f .devcontainer/compose.yml build tools
 # USRID=$(id -u) USRNAME=$(whoami) docker compose -f .devcontainer/compose.yml build --no-cache --pull=false
 #
-# >Dev Containers: Reopen in Container
+# > Dev Containers: Reopen in Container
 #
 # compose project name #########################################################
 #
@@ -14,25 +14,25 @@
 # takes as the project name. This can cause issues with dependencies on other
 # containers.
 #
-name: penroselamarck
+name: move37
 services:
   # Base development image with system dependencies
   base:
     build:
       context: ..
       dockerfile: .devcontainer/docker/Dockerfile.base
-    image: ghcr.io/genentech/penrose-lamarck-devcontainer-base:1.0.0
+    image: move37-devcontainer-base:1.0.0
 
-  # Tools image with Docker, Node.js, and CDK
+  # Tools image with Docker, Node.js, and common CLIs
   tools:
     build:
       context: ..
       dockerfile: .devcontainer/docker/Dockerfile.tools
-    image: ghcr.io/genentech/penrose-lamarck-devcontainer-tools:1.0.0
+    image: move37-devcontainer-tools:1.0.0
     depends_on:
       - base
 
-  # devcontainer image for development
+  # Devcontainer image for development
   devcontainer:
     build:
       context: ..
@@ -40,7 +40,7 @@ services:
       args:
         USRID: ${USRID}
         USRNAME: ${USRNAME}
-    image: ghcr.io/genentech/penrose-lamarck-devcontainer:1.0.0
-    container_name: penroselamarck-devcontainer
+    image: move37-devcontainer:1.0.0
+    container_name: move37-devcontainer
     depends_on:
       - tools

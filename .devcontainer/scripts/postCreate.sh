@@ -30,13 +30,22 @@ else
     echo "[postCreate] npm not found; skipping Codex CLI installation."
 fi
 
-# Python tooling and pre-commit (installation handled in tools image)
-echo "[postCreate] Setting up pre-commit hooks..."
+if [ -f "src/move37/web/package.json" ]; then
+    echo "[postCreate] Installing web dependencies..."
+    (
+        cd src/move37/web
+        npm install
+    )
+fi
 
-echo "[postCreate] Installing pre-commit hooks..."
-python3 -m pre_commit install
+if [ -f ".pre-commit-config.yaml" ]; then
+    echo "[postCreate] Installing pre-commit hooks..."
+    python3 -m pre_commit install
 
-echo "[postCreate] Running pre-commit across all files (non-blocking)..."
-python3 -m pre_commit run --all-files || true
+    echo "[postCreate] Running pre-commit across all files (non-blocking)..."
+    python3 -m pre_commit run --all-files || true
+else
+    echo "[postCreate] No .pre-commit-config.yaml found; skipping pre-commit setup."
+fi
 
 echo "[postCreate] Completed."

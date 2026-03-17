@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mv37-devtools"
+version = "0.1.0"
+description = "Repository bootstrap and policy management tooling for Move37."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "httpx>=0.28,<1.0",
+  "pydantic>=2.9,<3.0",
+  "pynacl>=1.5,<2.0",
+  "typer>=0.12,<1.0",
+]
+
+[project.scripts]
+mv37-devtools = "mv37_devtools.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

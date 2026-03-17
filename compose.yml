@@ -1,262 +1,471 @@
 ## compose project name #########################################################
 ##
-## ⚠️ ATTENTION ⚠️
+## The compose project is pinned so container, volume, and network names remain
+## stable across different shells and editors.
 ##
-## Using devcontainer, the project opens under your user name, which is what compose
-## takes as the project name. This can cause issues with dependencies on other
-## containers.
-##
-name: penroselamarck
+name: move37
+
 ## utils ##########################################################################
 ##
 ## recreate docker network
 ##
-##    docker network remove penroselamarck-network 2>/dev/null; docker network create penroselamarck-network
+##    docker network remove move37-network 2>/dev/null; docker network create move37-network
 ##
-## rebuild and start all containers
+## rebuild and start the full stack
 ##
 ##    docker compose down -v && docker compose up -d --build
 ##
-## project resources cleanup
+## stop everything and remove local state
 ##
-##   docker compose down -v && docker network remove penroselamarck-network
+##    docker compose down -v
 ##
-## full system docker cleanup
+## full docker cleanup
 ##
-##   docker system prune -a --volumes
+##    docker system prune -a --volumes
 ##
 services:
-  ## utils ##########################################################################
+  ### db ###########################################################################
   ##
-  ## rebuild and start container (⚠️ requires .env)
+  ## run only postgres
   ##
-  ##    docker compose --env-file .env down -v docs && docker compose --env-file .env up --build docs
+  ##    docker compose up -d --build db
   ##
-  ## expose ports
+  ## inspect connection from host
   ##
-  ##    curl http://penroselamarck-docs:8000 (devcontainer)
-  ##    curl http://localhost:8000 (host)
+  ##    docker compose exec db psql -U move37 -d move37 -c "\dt;"
   ##
-  ## ⚠️ ATTENTION ⚠️
+  ## reset db data
   ##
-  ##    you may want to run curl http://localhost:8000 from outside devcontainer
-  ##    to expose the port on your remote host.
+  ##    docker compose down -v db
   ##
-  docs:
+  ## logs
+  ##
+  ##    docker compose logs -f db
+  ##
+  ## notes
+  ##
+  ##    - this image runs postgres and then `alembic upgrade head`
+  ##    - init scripts in `src/move37/db/initdb.d` run only on first database bootstrap
+  ##    - migrations live in `src/move37/alembic`
+  ##
+  db:
     build:
       context: .
-      dockerfile: docs/Dockerfile
-    container_name: penroselamarck-docs
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./docs/sphinx/src:/docs/src
-      - ./docs/sphinx/build:/docs/build
-    command: sphinx-autobuild /docs/src /docs/build/html --host 0.0.0.0 --port 8000
+      dockerfile: ./src/move37/db/Dockerfile
+    container_name: move37-db
     environment:
-      - PYTHONDONTWRITEBYTECODE=1
-      - PYTHONUNBUFFERED=1
+      - POSTGRES_DB=${MOVE37_POSTGRES_DB:-move37}
+      - POSTGRES_USER=${MOVE37_POSTGRES_USER:-move37}
+      - POSTGRES_PASSWORD=${MOVE37_POSTGRES_PASSWORD:-move37}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB -h 127.0.0.1 -p 5432"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "${MOVE37_POSTGRES_HOST_PORT:-55432}:5432"
+    volumes:
+      - move37-db-data:/var/lib/postgresql/data
     networks:
-      - penroselamarck
+      - move37
 
   ### api ##########################################################################
   ##
-  ## quick start (host-side Codex CLI compatible; uses localhost)
+  ## quick start
   ##
-  ##    docker compose down -v api && docker compose up -d --build db api
-  ##
-  ## rebuild only API (keep db volume/data)
-  ##
-  ##    docker compose up -d --build api
+  ##    docker compose up -d --build db api
   ##
   ## logs
   ##
   ##    docker compose logs -f api
   ##
-  ## health and metadata
-  ##   host:
-  ##     curl -s http://localhost:8080/health | jq
-  ##     curl -s http://localhost:8080/.well-known/oauth-protected-resource | jq
+  ## health check
   ##
-  ##   devcontainer:
-  ##     curl -s http://penroselamarck-api:8080/health | jq
-  ##     curl -s http://penroselamarck-api:8080/.well-known/oauth-protected-resource | jq
+  ##    curl -s http://localhost:18080/health
   ##
-  ## MCP SSE handshake (returns initial endpoint event and keeps stream open)
-  ##   host:
-  ##     curl -N -H 'Accept: text/event-stream' http://localhost:8080/v1/mcp/sse
+  ## authenticated checks
   ##
-  ##   devcontainer:
-  ##     curl -N -H 'Accept: text/event-stream' http://penroselamarck-api:8080/v1/mcp/sse
+  ##    export MOVE37_TOKEN=move37-dev-token
+  ##    curl -s http://localhost:18080/v1/auth/me \
+  ##      -H "Authorization: Bearer ${MOVE37_TOKEN}" | jq
   ##
-  ## manual MCP JSON-RPC call (use session_id from SSE endpoint event)
-  ##    export SESSION_ID=981ba8457164413296f9a2e49a3f78b6
+  ##    curl -s http://localhost:18080/v1/graph \
+  ##      -H "Authorization: Bearer ${MOVE37_TOKEN}" | jq '.nodes | length'
   ##
-  ##    export MCP_ENDPOINT="http://localhost:8080/v1/mcp/messages?session_id=${SESSION_ID}" # host
-  ##    export MCP_ENDPOINT="http://penroselamarck-api:8080/v1/mcp/messages?session_id=${SESSION_ID}"  # devcontainer
+  ## MCP SSE handshake (returns endpoint event and keeps the stream open)
   ##
-  ##    (see SSE for logs)
-  ##    curl -s -X POST "$MCP_ENDPOINT" \
-  ##      -H 'Content-Type: application/json' \
-  ##      -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+  ##    curl -N \
+  ##      -H "Accept: text/event-stream" \
+  ##      -H "Authorization: Bearer ${MOVE37_TOKEN}" \
+  ##      http://localhost:18080/v1/mcp/sse
   ##
-  ##    curl -s -X POST "$MCP_ENDPOINT" \
-  ##      -H 'Content-Type: application/json' \
-  ##      -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"auth.login","arguments":{"token":"dev"}}}'
+  ## MCP streamable HTTP initialize
   ##
-  ## test GITHUB_TOKEN for API calls
+  ##    curl -s \
+  ##      -H "Content-Type: application/json" \
+  ##      -H "Authorization: Bearer ${MOVE37_TOKEN}" \
+  ##      -X POST http://localhost:18080/v1/mcp/sse \
+  ##      -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | jq
   ##
-  ##    docker compose exec api sh -lc '[ -n "$GITHUB_TOKEN" ] && [ -n "$GITHUB_REPOSITORY" ] && echo ok || echo missing'
+  ## MCP list tools
+  ##
+  ##    curl -s \
+  ##      -H "Content-Type: application/json" \
+  ##      -H "Authorization: Bearer ${MOVE37_TOKEN}" \
+  ##      -X POST http://localhost:18080/v1/mcp/sse \
+  ##      -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | jq
+  ##
+  ## MCP call tool over streamable HTTP
+  ##
+  ##    curl -s \
+  ##      -H "Content-Type: application/json" \
+  ##      -H "Authorization: Bearer ${MOVE37_TOKEN}" \
+  ##      -X POST http://localhost:18080/v1/mcp/sse \
+  ##      -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"graph.get","arguments":{}}}' | jq
+  ##
+  ## MCP POST via SSE session (use sessionId from the endpoint event)
+  ##
+  ##    export SESSION_ID=<from-sse-event>
+  ##    curl -s \
+  ##      -H "Content-Type: application/json" \
+  ##      -H "Authorization: Bearer ${MOVE37_TOKEN}" \
+  ##      -X POST "http://localhost:18080/v1/mcp/messages?session_id=${SESSION_ID}" \
+  ##      -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"activity.create","arguments":{"title":"Read race plan","notes":"","startDate":"2026-03-20","bestBefore":"","expectedTime":0.5,"realTime":0,"expectedEffort":null,"realEffort":null}}}'
+  ##
+  ## notes
+  ##
+  ##    - MOVE37_DATABASE_URL defaults to the postgres service in this compose file
+  ##    - MOVE37_API_BEARER_TOKEN secures all /v1 endpoints
+  ##    - first graph fetch seeds the default training graph for the configured subject
+  ##    - schema changes should go through Alembic revisions, not SQLAlchemy `create_all`
+  ##    - MCP is exposed under `/v1/mcp/*` and uses the same bearer auth as REST
+  ##    - graph operations are exposed as MCP tools through the internal tool registry
+  ##    - OTEL_* env vars are wired here for future telemetry exporters
   ##
   api:
     build:
       context: .
-      dockerfile: ./src/penroselamarck/api/Dockerfile
-    container_name: penroselamarck-api
-    image: ghcr.io/genentech/penrose-lamarck-api:1.0.0
-    env_file:
-      - path: ./src/penroselamarck/api/.env
-        required: false
-    ports:
-      - "8080:8080"
+      dockerfile: ./src/move37/api/Dockerfile
+    container_name: move37-api
     environment:
-      - PYTHONDONTWRITEBYTECODE=1
-      - PYTHONUNBUFFERED=1
-      - API_TITLE=${API_TITLE:-Penrose-Lamarck MCP (HTTP bridge)}
-      - API_VERSION=${API_VERSION:-}
-      - MCP_SERVER_NAME=${MCP_SERVER_NAME:-penroselamarck-api}
-      - MCP_SERVER_VERSION=${MCP_SERVER_VERSION:-}
-      - DATABASE_URL=postgresql://penroselamarck:penroselamarck@db:5432/penroselamarck
-      - AUTH0_DOMAIN=${AUTH0_DOMAIN:-}
-      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-}
-      - AUTH0_ISSUER=${AUTH0_ISSUER:-}
-      - AUTH0_JWKS_URL=${AUTH0_JWKS_URL:-}
-      - AUTH0_ALGORITHMS=${AUTH0_ALGORITHMS:-RS256}
-      - AUTH0_ROLES_CLAIM=${AUTH0_ROLES_CLAIM:-permissions}
-      - AUTH0_CLOCK_SKEW_SECONDS=${AUTH0_CLOCK_SKEW_SECONDS:-60}
-      - AUTH0_JWKS_CACHE_TTL_SECONDS=${AUTH0_JWKS_CACHE_TTL_SECONDS:-600}
-      - AUTH0_JWKS_TIMEOUT_SECONDS=${AUTH0_JWKS_TIMEOUT_SECONDS:-5}
-      - MCP_RESOURCE_URL=${MCP_RESOURCE_URL:-}
-      - MCP_OAUTH_SCOPES=${MCP_OAUTH_SCOPES:-}
-      - AUTH_DISABLED=${AUTH_DISABLED:-false}
-      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
-      - GITHUB_REPOSITORY=${GITHUB_REPOSITORY:-}
-      - GITHUB_BASE_BRANCH=${GITHUB_BASE_BRANCH:-main}
-      - GITHUB_API_URL=${GITHUB_API_URL:-https://api.github.com}
-      - GITHUB_MANIFEST_DIR=${GITHUB_MANIFEST_DIR:-docs/sphinx/src/manifest}
+      - MOVE37_DATABASE_URL=${MOVE37_DATABASE_URL:-postgresql+psycopg://move37:move37@db:5432/move37}
+      - MOVE37_API_BEARER_TOKEN=${MOVE37_API_BEARER_TOKEN:-move37-dev-token}
+      - MOVE37_API_BEARER_SUBJECT=${MOVE37_API_BEARER_SUBJECT:-local-user}
+      - MOVE37_AI_BASE_URL=${MOVE37_AI_BASE_URL:-http://move37-ai:8090}
+      - MOVE37_MILVUS_URI=${MOVE37_MILVUS_URI:-http://milvus-standalone:19530}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-http://langfuse-web:3000}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+      - OTEL_ENABLED=${OTEL_ENABLED:-false}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-move37-api}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      - OTEL_METRICS_EXPORT_INTERVAL_MS=${OTEL_METRICS_EXPORT_INTERVAL_MS:-5000}
     depends_on:
       db:
         condition: service_healthy
+      move37-ai:
+        condition: service_started
+    ports:
+      - "${MOVE37_API_HOST_PORT:-18080}:8080"
     networks:
-      - penroselamarck
+      - move37
 
   ### web ##########################################################################
   ##
-  ## rebuild and start container
+  ## rebuild and start only the web container
   ##
-  ##    docker compose stop web && docker compose up -d --build web
+  ##    docker compose up -d --build web
   ##
-  ## expose ports
+  ## browser entrypoint
   ##
-  ##    curl http://penroselamarck-web (devcontainer)
-  ##    curl http://localhost:5173 (host)
+  ##    open http://localhost:5174
   ##
   ## debug
   ##
   ##    docker compose logs -f web
   ##    docker compose exec web sh -lc 'ls -la /usr/share/nginx/html'
   ##
-  ## run
+  ## notes
   ##
-  ##    Open http://localhost:5173 in your browser
+  ##    - nginx proxies /v1 and /health to the api container
+  ##    - set WEB_STANDALONE_DEBUG=true to serve the UI without an API backend
+  ##    - set `VITE_MOVE37_API_TOKEN` at build time if you want the bundled UI to carry a token
   ##
   web:
     build:
       context: .
-      dockerfile: ./src/penroselamarck/web/Dockerfile
+      dockerfile: ./src/move37/web/Dockerfile
       args:
-        WEB_SDK_SOURCE: local
-    container_name: penroselamarck-web
-    image: ghcr.io/genentech/penrose-lamarck-web:1.0.0
-    env_file:
-      - path: ./src/penroselamarck/web/.env
-        required: false
-    ports:
-      - "5173:80"
+        VITE_MOVE37_API_BASE_URL: ${VITE_MOVE37_API_BASE_URL:-}
+        VITE_MOVE37_API_TOKEN: ${VITE_MOVE37_API_TOKEN:-move37-dev-token}
+    container_name: move37-web
+    environment:
+      - WEB_STANDALONE_DEBUG=${WEB_STANDALONE_DEBUG:-false}
     depends_on:
       - api
+    ports:
+      - "5174:80"
     networks:
-      - penroselamarck
+      - move37
 
-  ### orchestrator ###############################################################
-  ##
-  ## rebuild and start container
-  ##
-  ##    docker compose stop orchestrator && docker compose rm -f orchestrator && docker compose up -d --build orchestrator
-  ##
-  ## run in foreground (useful during development)
-  ##
-  ##    docker compose up --build orchestrator
-  ##
-  ## debug
-  ##
-  ##    docker logs -f penroselamarck-orch
-  ##    docker compose exec orchestrator sh -lc 'env | sort | grep -E "DATABASE_URL|ORCHESTRATOR_|OTEL_|LOG_LEVEL"'
-  ##
-  ## metrics/log observability check
-  ##
-  ##    curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | .labels.job'
-  ##    curl -s "http://localhost:3100/loki/api/v1/labels" | jq
-  ##
-  ## notes
-  ##
-  ##    - service env file: src/penroselamarck/orchestrator/.env
-  ##    - set ORCHESTRATOR_SEARCH_QUERIES to pre-run semantic searches per cycle
-  ##
-  orchestrator:
+  ### ai / rag ####################################################################
+  move37-ai:
     build:
       context: .
-      dockerfile: ./src/penroselamarck/orchestrator/Dockerfile
-    container_name: penroselamarck-orch
-    image: ghcr.io/genentech/penrose-lamarck-orchestrator:1.0.0
-    env_file:
-      - ./src/penroselamarck/orchestrator/.env
+      dockerfile: ./src/move37/rag/Dockerfile
+    container_name: move37-ai
     environment:
-      - PYTHONDONTWRITEBYTECODE=1
-      - PYTHONUNBUFFERED=1
-      - LOG_LEVEL=${ORCHESTRATOR_LOG_LEVEL:-INFO}
-      - DATABASE_URL=postgresql+psycopg://penroselamarck:penroselamarck@db:5432/penroselamarck
-      - ORCHESTRATOR_LANGUAGE=${ORCHESTRATOR_LANGUAGE:-}
-      - ORCHESTRATOR_CLASSIFY_LIMIT=${ORCHESTRATOR_CLASSIFY_LIMIT:-100}
-      - ORCHESTRATOR_SEARCH_QUERIES=${ORCHESTRATOR_SEARCH_QUERIES:-}
-      - ORCHESTRATOR_SEARCH_LIMIT=${ORCHESTRATOR_SEARCH_LIMIT:-20}
-      - OTEL_ENABLED=${OTEL_ENABLED:-true} # emit OTel telemetry if "true"
-      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-penroselamarck-orchestrator}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
-      - OTEL_METRICS_EXPORT_INTERVAL_MS=${OTEL_METRICS_EXPORT_INTERVAL_MS:-5000}
+      - MOVE37_DATABASE_URL=${MOVE37_DATABASE_URL:-postgresql+psycopg://move37:move37@db:5432/move37}
+      - MOVE37_MILVUS_URI=${MOVE37_MILVUS_URI:-http://milvus-standalone:19530}
+      - MOVE37_MILVUS_COLLECTION=${MOVE37_MILVUS_COLLECTION:-note_chunks_v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - MOVE37_EMBEDDING_MODEL=${MOVE37_EMBEDDING_MODEL:-text-embedding-3-large}
+      - MOVE37_CHAT_MODEL=${MOVE37_CHAT_MODEL:-gpt-4.1-mini}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-http://langfuse-web:3000}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
     depends_on:
       db:
         condition: service_healthy
-      otel-collector:
-        condition: service_healthy
+      milvus-standalone:
+        condition: service_started
+    ports:
+      - "18090:8090"
     networks:
-      - penroselamarck
+      - move37
+
+  move37-notes-worker:
+    build:
+      context: .
+      dockerfile: ./src/move37/worker/Dockerfile
+    container_name: move37-notes-worker
+    environment:
+      - MOVE37_DATABASE_URL=${MOVE37_DATABASE_URL:-postgresql+psycopg://move37:move37@db:5432/move37}
+      - MOVE37_MILVUS_URI=${MOVE37_MILVUS_URI:-http://milvus-standalone:19530}
+      - MOVE37_MILVUS_COLLECTION=${MOVE37_MILVUS_COLLECTION:-note_chunks_v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - MOVE37_EMBEDDING_MODEL=${MOVE37_EMBEDDING_MODEL:-text-embedding-3-large}
+      - LANGFUSE_HOST=${LANGFUSE_HOST:-http://langfuse-web:3000}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      milvus-standalone:
+        condition: service_started
+    networks:
+      - move37
+
+  ### milvus ######################################################################
+  milvus-etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: move37-milvus-etcd
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    command: etcd -advertise-client-urls=http://milvus-etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    volumes:
+      - move37-milvus-etcd-data:/etcd
+    networks:
+      - move37
+
+  milvus-minio:
+    image: minio/minio:RELEASE.2024-10-02T17-50-41Z
+    container_name: move37-milvus-minio
+    environment:
+      - MINIO_ROOT_USER=${MILVUS_MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MILVUS_MINIO_ROOT_PASSWORD:-minioadmin}
+    command: minio server /data
+    volumes:
+      - move37-milvus-minio-data:/data
+    networks:
+      - move37
+
+  milvus-standalone:
+    image: milvusdb/milvus:v2.5.5
+    container_name: move37-milvus
+    command: ["milvus", "run", "standalone"]
+    environment:
+      - ETCD_ENDPOINTS=milvus-etcd:2379
+      - MINIO_ADDRESS=milvus-minio:9000
+    depends_on:
+      - milvus-etcd
+      - milvus-minio
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    volumes:
+      - move37-milvus-data:/var/lib/milvus
+    networks:
+      - move37
+
+  ### langfuse ####################################################################
+  langfuse-postgres:
+    image: postgres:16-alpine
+    container_name: move37-langfuse-postgres
+    environment:
+      - POSTGRES_DB=${LANGFUSE_POSTGRES_DB:-langfuse}
+      - POSTGRES_USER=${LANGFUSE_POSTGRES_USER:-langfuse}
+      - POSTGRES_PASSWORD=${LANGFUSE_POSTGRES_PASSWORD:-langfuse}
+    volumes:
+      - move37-langfuse-postgres-data:/var/lib/postgresql/data
+    networks:
+      - move37
+
+  langfuse-redis:
+    image: redis:7-alpine
+    container_name: move37-langfuse-redis
+    networks:
+      - move37
+
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    container_name: move37-langfuse-clickhouse
+    environment:
+      - CLICKHOUSE_DB=${LANGFUSE_CLICKHOUSE_DB:-default}
+      - CLICKHOUSE_USER=${LANGFUSE_CLICKHOUSE_USER:-default}
+      - CLICKHOUSE_PASSWORD=${LANGFUSE_CLICKHOUSE_PASSWORD:-}
+    volumes:
+      - move37-langfuse-clickhouse-data:/var/lib/clickhouse
+    networks:
+      - move37
+
+  langfuse-web:
+    image: ghcr.io/langfuse/langfuse:3
+    container_name: move37-langfuse-web
+    environment:
+      - DATABASE_URL=postgresql://${LANGFUSE_POSTGRES_USER:-langfuse}:${LANGFUSE_POSTGRES_PASSWORD:-langfuse}@langfuse-postgres:5432/${LANGFUSE_POSTGRES_DB:-langfuse}
+      - DIRECT_URL=postgresql://${LANGFUSE_POSTGRES_USER:-langfuse}:${LANGFUSE_POSTGRES_PASSWORD:-langfuse}@langfuse-postgres:5432/${LANGFUSE_POSTGRES_DB:-langfuse}
+      - REDIS_CONNECTION_STRING=redis://langfuse-redis:6379
+      - CLICKHOUSE_URL=http://langfuse-clickhouse:8123
+      - NEXTAUTH_URL=${LANGFUSE_HOST:-http://localhost:3002}
+      - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET:-move37-langfuse-secret}
+      - SALT=${LANGFUSE_SALT:-move37-langfuse-salt}
+      - TELEMETRY_ENABLED=false
+    depends_on:
+      - langfuse-postgres
+      - langfuse-redis
+      - langfuse-clickhouse
+    ports:
+      - "3002:3000"
+    networks:
+      - move37
+
+  langfuse-worker:
+    image: ghcr.io/langfuse/langfuse:3
+    container_name: move37-langfuse-worker
+    command: ["worker"]
+    environment:
+      - DATABASE_URL=postgresql://${LANGFUSE_POSTGRES_USER:-langfuse}:${LANGFUSE_POSTGRES_PASSWORD:-langfuse}@langfuse-postgres:5432/${LANGFUSE_POSTGRES_DB:-langfuse}
+      - DIRECT_URL=postgresql://${LANGFUSE_POSTGRES_USER:-langfuse}:${LANGFUSE_POSTGRES_PASSWORD:-langfuse}@langfuse-postgres:5432/${LANGFUSE_POSTGRES_DB:-langfuse}
+      - REDIS_CONNECTION_STRING=redis://langfuse-redis:6379
+      - CLICKHOUSE_URL=http://langfuse-clickhouse:8123
+      - NEXTAUTH_URL=${LANGFUSE_HOST:-http://localhost:3002}
+      - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET:-move37-langfuse-secret}
+      - SALT=${LANGFUSE_SALT:-move37-langfuse-salt}
+      - TELEMETRY_ENABLED=false
+    depends_on:
+      - langfuse-postgres
+      - langfuse-redis
+      - langfuse-clickhouse
+    networks:
+      - move37
+
+  ### devtools #####################################################################
+  ##
+  ## build or rebuild the repo bootstrap image
+  ##
+  ##    docker compose build devtools
+  ##
+  ## validate local bootstrap prerequisites
+  ##
+  ##    export GITHUB_TOKEN="$(gh auth token)"
+  ##    docker compose run --rm devtools doctor
+  ##
+  ## plan repo settings against the default config
+  ##
+  ##    export GITHUB_TOKEN="$(gh auth token)"
+  ##    docker compose run --rm devtools bootstrap plan
+  ##
+  ## apply repo settings against the default config
+  ##
+  ##    export GITHUB_TOKEN="$(gh auth token)"
+  ##    docker compose run --rm devtools bootstrap apply
+  ##
+  ## notes
+  ##
+  ##    - this service is profile-gated and is not started by `docker compose up`
+  ##    - authenticate on the host with `gh auth login`, then pass `GITHUB_TOKEN`
+  ##    - the repo is bind-mounted at `/workspace` so `.env` files and configs are visible
+  ##
+  devtools:
+    profiles: ["devtools"]
+    build:
+      context: .
+      dockerfile: ./devtools/Dockerfile
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - MV37_DEVTOOLS_DEFAULT_CONFIG=${MV37_DEVTOOLS_DEFAULT_CONFIG:-devtools/config/move37.repo.toml}
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    networks:
+      - move37
+
+  ### fern docs ####################################################################
+  ##
+  ## build and run the public developer docs locally
+  ##
+  ##    docker compose --profile docs up --build fern-docs
+  ##
+  ## stop the docs container
+  ##
+  ##    docker compose --profile docs stop fern-docs
+  ##
+  ## notes
+  ##
+  ##    - this container exports the FastAPI OpenAPI spec on startup
+  ##    - `fern docs dev` serves the API reference, SDK docs, and CLI guides
+  ##    - set FERN_TOKEN if you later run local SDK generation with `fern generate --local`
+  ##
+  fern-docs:
+    profiles: ["docs"]
+    build:
+      context: .
+      dockerfile: ./fern/Dockerfile
+    container_name: move37-fern-docs
+    environment:
+      - MOVE37_DATABASE_URL=${MOVE37_DATABASE_URL:-sqlite+pysqlite:////tmp/move37-openapi.db}
+      - MOVE37_API_BEARER_TOKEN=${MOVE37_API_BEARER_TOKEN:-move37-dev-token}
+      - MOVE37_API_BEARER_SUBJECT=${MOVE37_API_BEARER_SUBJECT:-docs-user}
+      - FERN_TOKEN=${FERN_TOKEN:-}
+    volumes:
+      - .:/workspace
+    working_dir: /workspace/fern
+    command: ["sh", "-lc", "python3 scripts/export_openapi.py && HOST=0.0.0.0 fern docs dev --port 3000"]
+    ports:
+      - "3000:3000"
+    networks:
+      - move37
 
   ### observability ############################################################
   ##
   ## architecture
   ##
-  ##    orchestrator -> otel-collector -> prometheus (metrics)
-  ##                 -> otel-collector -> debug exporter (traces in collector logs)
+  ##    OTLP emitters -> otel-collector -> prometheus (metrics)
+  ##                  -> otel-collector -> debug exporter (traces in collector logs)
   ##    docker logs -> promtail -> loki -> grafana (logs)
   ##
   ## service roles
   ##
-  ##    otel-collector : ingests OTLP telemetry from orchestrator; exposes metrics endpoint for Prometheus
-  ##    prometheus     : scrapes and stores metrics time-series from otel-collector
+  ##    otel-collector : ingests OTLP telemetry and exposes a Prometheus scrape endpoint
+  ##    prometheus     : scrapes and stores metrics time-series
   ##    loki           : stores container logs
   ##    promtail       : tails docker container logs and ships them to loki
-  ##    grafana        : query/visualization UI for Prometheus and Loki data sources
+  ##    grafana        : query and visualization UI for Prometheus and Loki
   ##
   ## start / stop stack
   ##
@@ -264,13 +473,9 @@ services:
   ##    docker compose stop otel-collector prometheus loki promtail grafana
   ##    docker compose rm -f otel-collector prometheus loki promtail grafana
   ##
-  ## start orchestrator + observability together
-  ##
-  ##    docker compose up -d db otel-collector prometheus loki promtail grafana orchestrator
-  ##
   ## service status
   ##
-  ##    docker compose ps otel-collector prometheus loki promtail grafana orchestrator
+  ##    docker compose ps otel-collector prometheus loki promtail grafana
   ##
   ## endpoints
   ##
@@ -278,57 +483,26 @@ services:
   ##      Grafana    http://localhost:3001 (admin/admin)
   ##      Prometheus http://localhost:9090
   ##      Loki       http://localhost:3100
-  ##    devcontainer:
-  ##      Grafana    http://penroselamarck-grafana:3000
-  ##      Prometheus http://penroselamarck-prometheus:9090
-  ##      Loki       http://penroselamarck-loki:3100
   ##
   ## quick checks (metrics + logs)
   ##
-  ##    # Loki query (orchestrator logs)
-  ##    curl -s "http://localhost:3100/loki/api/v1/query?query=%7Bcompose_service%3D%22orchestrator%22%7D" | jq
-  ##
-  ##    # Prometheus scrape health
   ##    curl -s "http://localhost:9090/api/v1/targets" | jq '.data.activeTargets[] | {job: .labels.job, health: .health}'
-  ##
-  ##    # Orchestrator metrics
-  ##    curl -s "http://localhost:9090/api/v1/query?query=penroselamarck_orchestrator_runs_total" | jq
-  ##    curl -s "http://localhost:9090/api/v1/query?query=penroselamarck_orchestrator_exercises_processed_total" | jq
-  ##
-  ##    # Loki labels and recent orchestrator logs
   ##    curl -s "http://localhost:3100/loki/api/v1/labels" | jq
   ##    curl -sG "http://localhost:3100/loki/api/v1/query_range" \
-  ##      --data-urlencode 'query={compose_service="orchestrator"}' \
-  ##      --data-urlencode "limit=50" | jq
-  ##
-  ##    # same checks from devcontainer (service DNS names)
-  ##    curl -s "http://penroselamarck-prometheus:9090/api/v1/query?query=penroselamarck_orchestrator_runs_total" | jq
-  ##    curl -s "http://penroselamarck-loki:3100/loki/api/v1/labels" | jq
+  ##      --data-urlencode 'query={compose_project="move37"}' \
+  ##      --data-urlencode "limit=20" | jq
   ##
   ## deep debugging commands
   ##
-  ##    # follow pipeline logs by stage
   ##    docker compose logs -f otel-collector
   ##    docker compose logs -f promtail
   ##    docker compose logs -f loki
   ##    docker compose logs -f prometheus
-  ##
-  ##    # verify orchestrator OTEL env at runtime
-  ##    docker compose exec orchestrator sh -lc 'env | grep -E "^OTEL_|^LOG_LEVEL=" | sort'
-  ##
-  ##    # inspect collector exported metrics endpoint directly
-  ##    docker compose exec otel-collector sh -lc 'wget -qO- http://localhost:9464/metrics | head -n 40'
-  ##
-  ##    # inspect promtail discovery labels and positions
   ##    docker compose exec promtail sh -lc 'cat /tmp/positions.yaml'
   ##
-  ##    # render and verify compose wiring
-  ##    docker compose config | sed -n "/orchestrator:/,/^[^ ]/p"
-  ##
   otel-collector:
-    ## receives OTLP from orchestrator and republishes metrics for Prometheus scrape
     image: otel/opentelemetry-collector-contrib:0.107.0
-    container_name: penroselamarck-otel-collector
+    container_name: move37-otel-collector
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     healthcheck:
       test: ["CMD", "/otelcol-contrib", "validate", "--config=/etc/otelcol-contrib/config.yaml"]
@@ -337,230 +511,102 @@ services:
       retries: 5
       start_period: 5s
     volumes:
-      - ${HOST_WORKSPACE}/src/penroselamarck/otel/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./src/move37/otel/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
       - "4317:4317"
       - "4318:4318"
       - "9464:9464"
     networks:
-      - penroselamarck
+      - move37
 
   prometheus:
-    ## pulls metrics from otel-collector and stores time-series
     image: prom/prometheus:v2.54.1
-    container_name: penroselamarck-prometheus
+    container_name: move37-prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
       - "--web.enable-lifecycle"
     volumes:
-      - ${HOST_WORKSPACE}/src/penroselamarck/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - penroselamarck-prometheus-data:/prometheus
+      - ./src/move37/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - move37-prometheus-data:/prometheus
     ports:
       - "9090:9090"
     depends_on:
       - otel-collector
     networks:
-      - penroselamarck
+      - move37
 
   loki:
-    ## log storage backend queried by Grafana
     image: grafana/loki:2.9.10
-    container_name: penroselamarck-loki
+    container_name: move37-loki
     command: ["-config.file=/etc/loki/local-config.yaml"]
     volumes:
-      - ${HOST_WORKSPACE}/src/penroselamarck/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
-      - penroselamarck-loki-data:/loki
+      - ./src/move37/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - move37-loki-data:/loki
     ports:
       - "3100:3100"
     networks:
-      - penroselamarck
+      - move37
 
   promtail:
-    ## tails docker logs and pushes them to Loki
     image: grafana/promtail:2.9.10
-    container_name: penroselamarck-promtail
+    container_name: move37-promtail
     command: ["-config.file=/etc/promtail/config.yml"]
     volumes:
-      - ${HOST_WORKSPACE}/src/penroselamarck/promtail/promtail-config.yaml:/etc/promtail/config.yml:ro
+      - ./src/move37/promtail/promtail-config.yaml:/etc/promtail/config.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - loki
     networks:
-      - penroselamarck
+      - move37
 
   grafana:
-    ## dashboards and queries over Prometheus/Loki
     image: grafana/grafana:11.1.4
-    container_name: penroselamarck-grafana
+    container_name: move37-grafana
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
-      - ${HOST_WORKSPACE}/src/penroselamarck/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - penroselamarck-grafana-data:/var/lib/grafana
+      - ./src/move37/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - move37-grafana-data:/var/lib/grafana
     ports:
       - "3001:3000"
     depends_on:
       - prometheus
       - loki
     networks:
-      - penroselamarck
+      - move37
 
-  ## mcp inspector ##############################################################
-  ##
-  ## run inspector
-  ##
-  ##    docker compose run --rm --service-ports mcp-inspector
-  ##
-  ## debug
-  ##
-  ##      curl http://penroselamarck-api-inspector:6274 (devcontainer)
-  ##      curl http://localhost:6274 (host)
-  ##
-  ## run
-  ##
-  ##   Open http://localhost:6274 in your browser and connect to mcp at
-  mcp-inspector:
-    image: node:20-alpine
-    container_name: penroselamarck-api-inspector
-    working_dir: /workspace
-    volumes:
-      - ${HOST_WORKSPACE}:/workspace
-    command: >
-      sh -c "npx --yes @modelcontextprotocol/inspector --config /workspace/tests/mcp/config.json --server penroselamarck"
-    ports:
-      - "6274:6274"
-    depends_on:
-      - api
-    networks:
-      - penroselamarck
-
-  ## fastmcp client ##############################################################
-  ##
-  ## run smoke test
-  ##
-  ##    docker compose run --rm mcp-fastmcp
-  ##
-  mcp-fastapi:
-    image: python:3.11-slim
-    container_name: penroselamarck-api-fastmcp
-    working_dir: /workspace
-    volumes:
-      - ${HOST_WORKSPACE}:/workspace
-    command: >
-      sh -c "pip install -r tests/mcp/python-requirements.txt && python tests/mcp/fastmcp_client.py --sse-url http://penroselamarck-api:8080/v1/mcp/sse"
-    depends_on:
-      - api
-    networks:
-      - penroselamarck
-
-  ### pg database ##############################################################
-  ##
-  ## rebuild and start container
-  ##
-  ##    docker compose down -v db && docker compose up --build db
-  ##
-  ## NOTE applies migrations on startup.
-  ## Set DB_MOCK_DATA=true to run deterministic seed data at startup.
-  ##
-  ## debug
-  ##
-  ##    docker compose logs -f db
-  ##    docker compose exec db psql -U penroselamarck -d penroselamarck -c "select * from exercises limit 20;"
-  ##    docker compose exec db psql -U penroselamarck -d penroselamarck -c "\dt;"
-  ##
-  ## ⚠️ ATTENTION ⚠️
-  ##
-  ## It requires .env file
-  ##
-  db:
-    build:
-      context: .
-      dockerfile: src/penroselamarck/db/Dockerfile
-    image: ghcr.io/genentech/penrose-lamarck-pg:1.0.0
-    container_name: penroselamarck-db
-    env_file:
-      - path: ./src/penroselamarck/db/.env
-        required: true
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    volumes:
-      - penroselamarck-db-data:/var/lib/postgresql/data
-    networks:
-      - penroselamarck
-
-  ### lineage ##############################################################
-  ##
-  ##
-  marquez-db:
-    image: postgres:15-alpine
-    container_name: penroselamarck-marquez-db
-    environment:
-      - POSTGRES_USER=marquez
-      - POSTGRES_PASSWORD=marquez
-      - POSTGRES_DB=marquez
-    ports:
-      - "5433:5432"
-    volumes:
-      - penroselamarck-marquez-data:/var/lib/postgresql/data
-    networks:
-      - penroselamarck
-
-  marquez:
-    image: marquezproject/marquez:0.44.0
-    container_name: penroselamarck-marquez
-    environment:
-      - MARQUEZ_DB_HOST=marquez-db
-      - MARQUEZ_DB_PORT=5432
-      - MARQUEZ_DB_USER=marquez
-      - MARQUEZ_DB_PASSWORD=marquez
-      - MARQUEZ_DB=marquez
-      - MARQUEZ_PORT=5000
-    ports:
-      - "5000:5000"
-    depends_on:
-      - marquez-db
-    networks:
-      - penroselamarck
-
-  marquez-web:
-    image: marquezproject/marquez-web:0.44.0
-    container_name: penroselamarck-marquez-web
-    environment:
-      - MARQUEZ_HOST=marquez
-      - MARQUEZ_PORT=5000
-    ports:
-      - "3000:3000"
-    depends_on:
-      - marquez
-    networks:
-      - penroselamarck
-
+## persistent resources ###########################################################
+##
+## move37-db-data keeps postgres state between restarts.
+##
 volumes:
-  penroselamarck-db-data:
-    name: penroselamarck-db-data
-  penroselamarck-marquez-data:
-    name: penroselamarck-marquez-data
-  penroselamarck-prometheus-data:
-    name: penroselamarck-prometheus-data
-  penroselamarck-loki-data:
-    name: penroselamarck-loki-data
-  penroselamarck-grafana-data:
-    name: penroselamarck-grafana-data
+  move37-db-data:
+    name: move37-db-data
+  move37-milvus-data:
+    name: move37-milvus-data
+  move37-milvus-etcd-data:
+    name: move37-milvus-etcd-data
+  move37-milvus-minio-data:
+    name: move37-milvus-minio-data
+  move37-prometheus-data:
+    name: move37-prometheus-data
+  move37-loki-data:
+    name: move37-loki-data
+  move37-grafana-data:
+    name: move37-grafana-data
+  move37-langfuse-postgres-data:
+    name: move37-langfuse-postgres-data
+  move37-langfuse-clickhouse-data:
+    name: move37-langfuse-clickhouse-data
 
-## utils ##########################################################################
+## shared network #################################################################
 ##
-## inspect docker network containers
+## This stack expects the external docker network to exist before startup.
 ##
-##    docker network inspect penroselamarck-network --format '{{range .Containers}}{{.Name}} {{end}}'
 networks:
-  penroselamarck:
-    name: penroselamarck-network
+  move37:
+    name: move37-network
     external: true

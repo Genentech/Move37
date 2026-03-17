@@ -1,0 +1,29 @@
+{
+  "name": "move37-eks-cdk",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "./scripts/with-env.sh cdk",
+    "bootstrap": "./scripts/with-env.sh cdk bootstrap",
+    "synth": "./scripts/with-env.sh cdk synth",
+    "deploy": "./scripts/with-env.sh cdk deploy",
+    "synth:oidc-bootstrap": "./scripts/with-env.sh cdk --app 'npx ts-node --prefer-ts-exts bin/move37-github-oidc-bootstrap.ts' synth Move37GithubOidcBootstrapStack",
+    "deploy:oidc-bootstrap": "./scripts/with-env.sh cdk --app 'npx ts-node --prefer-ts-exts bin/move37-github-oidc-bootstrap.ts' deploy Move37GithubOidcBootstrapStack --require-approval never",
+    "synth:eks-access": "./scripts/with-env.sh cdk --app 'npx ts-node --prefer-ts-exts bin/move37-eks-access-role.ts' synth Move37EksAccessRoleStack",
+    "deploy:eks-access": "./scripts/with-env.sh cdk --app 'npx ts-node --prefer-ts-exts bin/move37-eks-access-role.ts' deploy Move37EksAccessRoleStack --require-approval never"
+  },
+  "dependencies": {
+    "@aws-cdk/lambda-layer-kubectl-v29": "^2.1.1",
+    "aws-cdk-lib": "^2.167.1",
+    "constructs": "^10.4.2",
+    "source-map-support": "^0.5.21"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.24",
+    "aws-cdk": "^2.1003.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  }
+}

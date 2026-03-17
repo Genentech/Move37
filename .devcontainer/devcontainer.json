@@ -1,52 +1,58 @@
 {
-	"image": "ghcr.io/genentech/penrose-lamarck-devcontainer:1.0.0",
-	"runArgs": [
-		"--name",
-		"penroselamarck-devcontainer",
-		"--rm",
-		"--network",
-		"penroselamarck-network"
-	],
-	"workspaceFolder": "/home/${localEnv:USER}",
-	"workspaceMount": "source=${localWorkspaceFolder},target=/home/${localEnv:USER},type=bind,consistency=cached",
-	"remoteUser": "${localEnv:USER}",
-	"forwardPorts": [
-		8020,
-		5432
-	],
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"eamodio.gitlens",
-				"GitHub.vscode-pull-request-github",
-				"GitHub.copilot",
-				"GitHub.copilot-chat",
-				"GitHub.vscode-github-actions",
-				"shalldie.background",
-				"ms-azuretools.vscode-docker",
-				"ms-python.python",
-				"kamikillerto.vscode-colorize",
-				"trond-snekvik.simple-rst",
-				"njpwerner.autodocstring",
-				"redhat.vscode-yaml",
-				"davidanson.vscode-markdownlint",
-				"timonwong.shellcheck",
-				"openai.chatgpt"
-			],
-			"settings": {
-				"python.pythonPath": "/usr/local/bin/python"
-			}
-		}
-	},
-	"features": {
-		"ghcr.io/devcontainers/features/common-utils:2": { "installZsh": false },
-		"ghcr.io/devcontainers/features/github-cli:1": {},
-		"ghcr.io/devcontainers/features/aws-cli:1": {},
-		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
-	},
+  "image": "move37-devcontainer:1.0.0",
+  "runArgs": [
+    "--name",
+    "move37-devcontainer",
+    "--rm",
+    "--network",
+    "move37-network"
+  ],
+  "workspaceFolder": "/home/${localEnv:USER}",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/home/${localEnv:USER},type=bind,consistency=cached",
+  "remoteUser": "${localEnv:USER}",
+  "forwardPorts": [
+    5174,
+    18080,
+    55432,
+    3001,
+    9090,
+    3100
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "eamodio.gitlens",
+        "GitHub.vscode-pull-request-github",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "GitHub.vscode-github-actions",
+        "shalldie.background",
+        "ms-azuretools.vscode-docker",
+        "ms-python.python",
+        "kamikillerto.vscode-colorize",
+        "trond-snekvik.simple-rst",
+        "njpwerner.autodocstring",
+        "redhat.vscode-yaml",
+        "davidanson.vscode-markdownlint",
+        "timonwong.shellcheck",
+        "openai.chatgpt"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/bin/python3"
+      }
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": false
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
   "mounts": [
     "source=${localEnv:HOME}/.ssh,target=/home/${localEnv:USER}/.ssh,type=bind"
   ],
-	"postCreateCommand": "bash .devcontainer/scripts/postCreate.sh",
-	"postStartCommand": "bash .devcontainer/scripts/postStart.sh"
+  "postCreateCommand": "bash .devcontainer/scripts/postCreate.sh",
+  "postStartCommand": "bash .devcontainer/scripts/postStart.sh"
 }
