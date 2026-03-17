@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://schema.buildwithfern.dev/docs-yml.json
+title: Move37 Developer Docs
+default-language: typescript
+navigation:
+  - section: Overview
+    contents:
+      - page: Welcome
+        path: ./pages/welcome.mdx
+      - page: SDKs
+        path: ./pages/sdks.mdx
+      - page: CLI
+        path: ./pages/cli.mdx
+  - api: API Reference
+    snippets:
+      typescript: "@move37/sdk"
+      python: move37

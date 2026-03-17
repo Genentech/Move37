@@ -1,0 +1,25 @@
+---
+title: Welcome
+description: Overview of the Move37 API, SDKs, and CLI docs workspace.
+---
+
+## What is Move37?
+
+Move37 is a human operating system for the AI age. The developer surface currently centers on a FastAPI backend, a TypeScript SDK track, and an upcoming Python SDK intended to support CLI workflows as well as direct scripting.
+
+## What this site will contain
+
+- API reference generated from the FastAPI OpenAPI contract
+- SDK snippets for TypeScript and Python
+- integration guides for authentication and common workflows
+- CLI-focused guides built alongside the Python SDK
+
+## Source of truth
+
+The API reference is generated from the FastAPI app in the main repository. Before regenerating docs or SDKs, refresh the checked-out OpenAPI spec:
+
+```bash
+python3 scripts/export_openapi.py
+```
+
+If you are running through Docker Compose, the `fern-docs` service handles this automatically on startup.

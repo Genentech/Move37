@@ -1,0 +1,32 @@
+---
+title: SDKs
+description: TypeScript and Python SDK generation strategy for Move37.
+---
+
+## Supported SDK tracks
+
+Move37 is currently configured for:
+
+- TypeScript
+- Python
+
+Both SDKs are configured for local file system output first so the repository can preview generated clients before deciding final registry or repository publishing rules.
+
+## Local preview workflow
+
+Use Fern local generation when iterating on the API contract:
+
+```bash
+export FERN_TOKEN=...
+fern generate --local --group ts-sdk
+fern generate --local --group python-sdk
+```
+
+Generated output lands in:
+
+- `sdks/typescript`
+- `sdks/python`
+
+## Existing SDK code
+
+The repository still contains a hand-written Node client in `src/move37/sdk/node`. Keep that in mind while migrating toward generated SDKs. During the transition, generated SDK output should be evaluated before replacing the current package surface.

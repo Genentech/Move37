@@ -1,0 +1,29 @@
+---
+title: CLI
+description: Guidance for documenting the planned Python-backed Move37 CLI.
+---
+
+## CLI docs strategy
+
+The CLI should be documented here as authored guides, not as a separate contributor-docs track.
+
+This keeps the user-facing workflow in the same place as:
+
+- API reference
+- SDK installation instructions
+- authentication guidance
+- copy-paste examples for TypeScript and Python users
+
+## Suggested page structure
+
+As the CLI surface is added, extend this section with:
+
+- installation
+- authentication
+- shell completion
+- common workflows
+- troubleshooting
+
+## Relationship to the Python SDK
+
+The planned Python SDK is the right place to centralize transport and auth logic. The CLI docs should show when to use the CLI directly and when to switch to Python for scripting or automation.

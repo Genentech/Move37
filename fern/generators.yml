@@ -1,0 +1,33 @@
+api:
+  specs:
+    - openapi: ./openapi/move37.openapi.json
+      settings:
+        title-as-schema-name: true
+        respect-forward-compatible-enums: true
+
+metadata:
+  description: Official SDKs for the Move37 API.
+  authors:
+    - name: Move37
+      email: engineering@move37.dev
+
+readme:
+  introduction: Official TypeScript and Python SDKs for the Move37 API.
+
+groups:
+  ts-sdk:
+    generators:
+      - name: fernapi/fern-typescript-sdk
+        version: 3.53.14
+        output:
+          location: local-file-system
+          path: ../sdks/typescript
+          package-name: "@move37/sdk"
+  python-sdk:
+    generators:
+      - name: fernapi/fern-python-sdk
+        version: 4.61.5
+        output:
+          location: local-file-system
+          path: ../sdks/python
+          package-name: move37
