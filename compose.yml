@@ -400,7 +400,8 @@ services:
   ##
   ##    - this service is profile-gated and is not started by `docker compose up`
   ##    - authenticate on the host with `gh auth login`, then pass `GITHUB_TOKEN`
-  ##    - mount host AWS config or pass AWS env vars before running `infra *` commands
+  ##    - set `MOVE37_AWS_DIR=$HOME/.aws` if you want profile-based AWS auth in the container
+  ##    - otherwise pass AWS env vars before running `infra *` commands
   ##    - the repo is bind-mounted at `/workspace` so `.env` files and configs are visible
   ##
   devtools:
@@ -426,7 +427,7 @@ services:
       - MOVE37_DEPLOY_BRANCH=${MOVE37_DEPLOY_BRANCH:-}
     volumes:
       - .:/workspace
-      - ${HOME}/.aws:/root/.aws:ro
+      - ${MOVE37_AWS_DIR:-/tmp/move37-no-aws}:/root/.aws:ro
     working_dir: /workspace
     networks:
       - move37
