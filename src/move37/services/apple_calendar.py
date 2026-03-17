@@ -472,6 +472,7 @@ class AppleCalendarSyncService:
             if snapshot is None:
                 return {"updatedActivities": 0, "clearedActivities": 0}
             nodes_by_id = {str(node["id"]): node for node in snapshot["nodes"]}
+            graph_dirty = False
             for link in link_repository.list_by_subject(APPLE_PROVIDER, subject):
                 node = nodes_by_id.get(link.activity_id)
                 if node is None:
@@ -482,18 +483,22 @@ class AppleCalendarSyncService:
                     if node.get("startDate"):
                         node["startDate"] = ""
                         cleared_activities += 1
+                        graph_dirty = True
                     link_repository.delete(link)
                     continue
                 start_date = event.starts_at.date().isoformat()
                 if node.get("title") != event.title:
                     node["title"] = event.title
                     updated_activities += 1
+                    graph_dirty = True
                 if node.get("startDate") != start_date:
                     node["startDate"] = start_date
                     updated_activities += 1
+                    graph_dirty = True
                 link.last_seen_etag = event.etag
                 session.add(link)
-            graph_repository.save_snapshot(subject, snapshot)
+            if graph_dirty:
+                graph_repository.save_snapshot(subject, snapshot)
             session.commit()
         return {"updatedActivities": updated_activities, "clearedActivities": cleared_activities}
 
