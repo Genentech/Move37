@@ -267,6 +267,61 @@ class ChatMessageResponse(BaseModel):
     assistantMessage: ChatMessageOutput
 
 
+class CalendarDescriptorOutput(BaseModel):
+    """Configured calendar descriptor."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    name: str
+    readOnly: bool
+
+
+class AppleCalendarStatusOutput(BaseModel):
+    """Apple Calendar connection status."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+    connected: bool
+    provider: str
+    writableCalendarId: str | None = None
+    calendars: list[CalendarDescriptorOutput]
+
+
+class CalendarEventOutput(BaseModel):
+    """Transport-safe calendar event payload."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    calendarId: str | None = None
+    calendarName: str | None = None
+    title: str
+    startsAt: str
+    endsAt: str
+    allDay: bool
+    linkedActivityId: str | None = None
+    managedByMove37: bool = False
+
+
+class CalendarEventListOutput(BaseModel):
+    """List of calendar events."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    events: list[CalendarEventOutput]
+
+
+class CalendarReconcileOutput(BaseModel):
+    """Summary of a calendar reconciliation pass."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    updatedActivities: int
+    clearedActivities: int
+
+
 class ActivityDependencyOutput(BaseModel):
     """Dependency edge payload."""
 

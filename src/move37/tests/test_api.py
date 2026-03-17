@@ -64,6 +64,60 @@ class ApiTest(unittest.TestCase):
         self.assertGreater(len(payload["nodes"]), 0)
         self.assertIn("graphId", payload)
 
+    def test_apple_calendar_status_returns_service_status(self) -> None:
+        self.client.app.state.services.apple_calendar_service.get_status = lambda: {
+            "enabled": True,
+            "connected": True,
+            "provider": "apple",
+            "writableCalendarId": "calendar://primary",
+            "calendars": [
+                {"id": "calendar://primary", "name": "primary", "readOnly": False},
+            ],
+        }
+
+        response = self.client.get("/v1/calendars/apple/status")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["provider"], "apple")
+
+    def test_apple_calendar_events_returns_normalized_events(self) -> None:
+        self.client.app.state.services.apple_calendar_service.list_events = lambda subject, start, end: [
+            {
+                "id": "event-1",
+                "calendarId": "calendar://primary",
+                "calendarName": "primary",
+                "title": "Deep work",
+                "startsAt": "2026-03-17T00:00:00+00:00",
+                "endsAt": "2026-03-18T00:00:00+00:00",
+                "allDay": True,
+                "linkedActivityId": "wake-early",
+                "managedByMove37": True,
+            }
+        ]
+
+        response = self.client.get(
+            "/v1/calendars/apple/events",
+            headers={"Authorization": "Bearer test-token"},
+            params={"start": "2026-03-17T00:00:00Z", "end": "2026-03-20T00:00:00Z"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["events"][0]["linkedActivityId"], "wake-early")
+
+    def test_apple_calendar_reconcile_returns_summary(self) -> None:
+        self.client.app.state.services.apple_calendar_service.reconcile = lambda subject: {
+            "updatedActivities": 2,
+            "clearedActivities": 1,
+        }
+
+        response = self.client.post(
+            "/v1/calendars/apple/reconcile",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["updatedActivities"], 2)
+
     def test_create_note_creates_note_and_parentless_graph_node(self) -> None:
         response = self.client.post(
             "/v1/notes",

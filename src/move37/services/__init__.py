@@ -11,6 +11,7 @@ from importlib import import_module
 _EXPORTS = {
     "ActivityGraphService": "move37.services.activity_graph",
     "AppleCalendar": "move37.services.calendar",
+    "AppleCalendarSyncService": "move37.services.apple_calendar",
     "BankAccountInterface": "move37.services.bank_account",
     "CalendarInterface": "move37.services.calendar",
     "ChatSessionService": "move37.services.chat",

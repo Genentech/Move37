@@ -71,6 +71,19 @@ class ActivityGraphServiceTest(unittest.TestCase):
             full_graph["schedules"],
         )
 
+    def test_fork_clears_scheduling_fields(self) -> None:
+        self.service.update_activity(
+            self.subject,
+            "wake-early",
+            {"startDate": "2026-03-17", "bestBefore": "2026-03-18"},
+        )
+
+        graph = self.service.fork_activity(self.subject, "wake-early")
+        fork = next(node for node in graph["nodes"] if node["id"] == "wake-early-fork")
+
+        self.assertEqual(fork["startDate"], "")
+        self.assertEqual(fork["bestBefore"], "")
+
 
 if __name__ == "__main__":
     unittest.main()
