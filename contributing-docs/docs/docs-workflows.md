@@ -1,42 +1,82 @@
 ---
-sidebar_position: 4
+sidebar_position: 7
 title: Docs Workflows
 description: Ownership and deployment rules for contributor docs and the Fern developer portal.
 ---
 
-## Contributor docs
+## Contributor docs live in this site
 
-Contributor docs are published from `contributing-docs/` to GitHub Pages through `.github/workflows/deploy-contributor-docs.yml`.
+Use `contributing-docs/` for:
 
-For the `Genentech/Move37` repository, the default GitHub Pages URL is:
+- onboarding
+- local setup
+- repository map
+- architecture
+- CI and release rules
+- troubleshooting
+- anything a contributor needs before changing code safely
 
-```text
-https://genentech.github.io/Move37/
-```
+Publishing model:
 
-The Docusaurus config derives that project-page base path automatically when the GitHub Actions environment is present.
+- built by `.github/workflows/deploy-contributor-docs.yml`
+- published to GitHub Pages
+- default project-page URL for `Genentech/Move37`: `https://genentech.github.io/Move37/`
 
-## Fern docs
+The Docusaurus config derives the project-page base path automatically in GitHub Actions, so local development can still use `/` while the deployed site uses `/Move37/`.
 
-The Fern workspace lives in `fern/` and is not published by GitHub Pages.
+## Fern docs live separately
 
-Instead:
+Use `fern/` for:
+
+- API reference
+- SDK docs
+- SDK snippets
+- CLI guides
+- other user-facing integration material
+
+The Fern workspace is not published through GitHub Pages.
+
+Current workflow:
 
 - local preview runs in the `fern-docs` Compose service
-- the container exports `move37.openapi.json` directly from the FastAPI app before starting the docs server
-- SDK generation is configured for local file system output first, so the final publishing target can be chosen later
+- the container exports `move37.openapi.json` from the FastAPI app before starting `fern docs dev`
+- SDK generation is configured for local file-system output first
+- final public hosting is intentionally still undecided
 
-## SDK generation
+## When to update both docs tracks
 
-Fern is configured for two SDK tracks:
+Update `contributing-docs/` and `fern/` together when:
 
-- TypeScript
-- Python
+- you add or remove major API capabilities
+- the SDK surface changes in a way contributors need to understand
+- the OpenAPI export workflow changes
+- the local docs development path changes
 
-The workspace is intentionally set up for local preview first. When you decide the final publishing target, update `fern/generators.yml` with the real package registry and repository settings, then add the corresponding release automation.
+## Working rules
 
-## Editing rules
+- If you change FastAPI routes or schemas, regenerate the Fern OpenAPI snapshot before validating public docs.
+- If you change setup steps, service names, ports, tags, or CI behavior, update contributor docs in the same PR.
+- If you introduce a new deployment or release path, document both who owns it and how a contributor should validate it locally.
 
-- Update `contributing-docs/` when you change repository shape, local setup, or CI or deployment workflows.
-- Update `fern/` when you change the public API, SDK ergonomics, examples, or CLI guidance.
-- If you change FastAPI routes or schemas, regenerate the OpenAPI spec before validating the Fern workspace.
+## Practical commands
+
+Contributor docs local preview:
+
+```bash
+cd contributing-docs
+npm install
+npm run start
+```
+
+Fern local preview:
+
+```bash
+docker compose --profile docs up --build fern-docs
+```
+
+Manual OpenAPI export for Fern:
+
+```bash
+cd fern
+python3 scripts/export_openapi.py
+```
