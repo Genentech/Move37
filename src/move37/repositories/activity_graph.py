@@ -57,6 +57,22 @@ class ActivityGraphRepository:
         ).delete(synchronize_session=False)
         self._session.flush()
 
+        node_payloads = list(snapshot["nodes"])
+        dependency_payloads = list(snapshot["dependencies"])
+        schedule_payloads = list(snapshot["schedules"])
+        node_ids = {str(node["id"]) for node in node_payloads}
+
+        for edge in dependency_payloads:
+            if edge["parentId"] not in node_ids or edge["childId"] not in node_ids:
+                raise ValueError(
+                    "Activity dependency references a node that is missing from the snapshot."
+                )
+        for edge in schedule_payloads:
+            if edge["earlierId"] not in node_ids or edge["laterId"] not in node_ids:
+                raise ValueError(
+                    "Activity schedule references a node that is missing from the snapshot."
+                )
+
         nodes = [
             ActivityNodeModel(
                 id=node["id"],
@@ -74,8 +90,11 @@ class ActivityGraphRepository:
                 real_effort=node.get("realEffort"),
                 work_started_at=self._parse_datetime(node.get("workStartedAt")),
             )
-            for index, node in enumerate(snapshot["nodes"])
+            for index, node in enumerate(node_payloads)
         ]
+        self._session.add_all(nodes)
+        self._session.flush()
+
         dependencies = [
             ActivityDependencyModel(
                 graph_id=graph.id,
@@ -83,7 +102,7 @@ class ActivityGraphRepository:
                 parent_id=edge["parentId"],
                 child_id=edge["childId"],
             )
-            for index, edge in enumerate(snapshot["dependencies"])
+            for index, edge in enumerate(dependency_payloads)
         ]
         schedules = [
             ActivityScheduleModel(
@@ -92,9 +111,9 @@ class ActivityGraphRepository:
                 earlier_id=edge["earlierId"],
                 later_id=edge["laterId"],
             )
-            for index, edge in enumerate(snapshot["schedules"])
+            for index, edge in enumerate(schedule_payloads)
         ]
-        self._session.add_all(nodes + dependencies + schedules)
+        self._session.add_all(dependencies + schedules)
         self._session.flush()
         self._session.expire(graph, ["nodes", "dependencies", "schedules"])
         return self.get_snapshot(subject) or {
