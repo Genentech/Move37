@@ -1,14 +1,61 @@
-.bash_history
-.cache
-.gitconfig
-.local
-.ssh
-.sudo_as_admin_successful
-.vscode-server
-.config
-.dotnet
-.gnupg
+# Environment files
 .env
-.api.vscode.json
-.npm
-node_modules
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.pytype/
+.hypothesis/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Node / frontend
+node_modules/
+**/node_modules/
+dist/
+build/
+coverage/
+.vite/
+.vite-temp/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+
+# Logs and runtime artifacts
+*.log
+*.out
+*.err
+tmp/
+temp/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local database / misc generated files
+*.sqlite
+*.sqlite3
+*.db
