@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useActivityGraph, useChatSession, useNotes } from "@move37/sdk/react";
+import { useActivityGraph, useAppleCalendar, useChatSession, useNotes } from "@move37/sdk/react";
 import "./App.css";
 import {
   buildIndexes,
@@ -14,6 +14,7 @@ import {
   rotateY,
   wouldCreateCycle,
 } from "./graph";
+import { CalendarSurface, getCalendarWindow, shiftCalendarAnchor, TaskListSurface } from "./surfaces";
 
 const TOPBAR_MESSAGES = [
   "human operating system for the AI age",
@@ -358,46 +359,6 @@ function projectSpatialPoint({ point, centerX, centerY, radius, rotationX, rotat
 }
 
 function buildClockwiseArcPath(from, to, options) {
-  if (
-    options.viewMode === "3d" &&
-    from.point3d &&
-    to.point3d &&
-    from.radialRatio != null &&
-    to.radialRatio != null
-  ) {
-    const start = normalizePoint(from.point3d);
-    const end = normalizePoint(to.point3d);
-    const dot = Math.max(-1, Math.min(1, start.x * end.x + start.y * end.y + start.z * end.z));
-    const omega = Math.acos(dot);
-    if (omega < 1e-5) {
-      return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
-    }
-    const sinOmega = Math.sin(omega) || 1;
-    const radialRatio = from.radialRatio;
-    const steps = 14;
-    let path = `M ${from.x} ${from.y}`;
-    for (let index = 1; index <= steps; index += 1) {
-      const t = index / steps;
-      const scaleStart = Math.sin((1 - t) * omega) / sinOmega;
-      const scaleEnd = Math.sin(t * omega) / sinOmega;
-      const point = {
-        x: (start.x * scaleStart + end.x * scaleEnd) * radialRatio,
-        y: (start.y * scaleStart + end.y * scaleEnd) * radialRatio,
-        z: (start.z * scaleStart + end.z * scaleEnd) * radialRatio,
-      };
-      const projected = projectSpatialPoint({
-        point,
-        centerX: options.centerX,
-        centerY: options.centerY,
-        radius: options.radius,
-        rotationX: options.rotationX,
-        rotationY: options.rotationY,
-      });
-      path += ` L ${projected.x} ${projected.y}`;
-    }
-    return path;
-  }
-
   if (from.level !== to.level || from.radialRatio == null || to.radialRatio == null) {
     return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
   }
@@ -407,13 +368,14 @@ function buildClockwiseArcPath(from, to, options) {
     delta += Math.PI * 2;
   }
   const steps = Math.max(10, Math.ceil(delta / (Math.PI / 18)));
+  const arcRatio = Math.min(0.98, Math.max(from.radialRatio, to.radialRatio) + 0.045);
   let path = `M ${from.x} ${from.y}`;
 
   for (let index = 1; index <= steps; index += 1) {
     const angle = from.angle + (delta * index) / steps;
     const point = projectLevelPoint({
       angle,
-      radialRatio: from.radialRatio,
+      radialRatio: arcRatio,
       centerX: options.centerX,
       centerY: options.centerY,
       radius: options.radius,
@@ -960,6 +922,21 @@ export default function App() {
     }),
     [],
   );
+  const [surfaceMode, setSurfaceMode] = useState("graph");
+  const [viewMode, setViewMode] = useState("3d");
+  const [calendarRange, setCalendarRange] = useState("week");
+  const [calendarAnchorDate, setCalendarAnchorDate] = useState(() => new Date());
+  const calendarWindow = useMemo(
+    () => getCalendarWindow(calendarRange, calendarAnchorDate),
+    [calendarAnchorDate, calendarRange],
+  );
+  const calendarQueryRange =
+    surfaceMode === "calendar"
+      ? {
+          start: calendarWindow.start.toISOString(),
+          end: calendarWindow.end.toISOString(),
+        }
+      : null;
   const {
     graph: canonicalGraph,
     error: apiError,
@@ -989,9 +966,15 @@ export default function App() {
     sendMessage,
     loading: chatLoading,
   } = useChatSession(apiOptions);
+  const {
+    status: appleCalendarStatus,
+    events: appleCalendarEvents,
+    loading: calendarLoading,
+    reconciling: calendarReconciling,
+    reconcile: reconcileAppleCalendar,
+  } = useAppleCalendar({ ...apiOptions, range: calendarQueryRange });
   const [graph, setGraph] = useState(() => sanitizeGraph(EMPTY_GRAPH));
   const [transition, setTransition] = useState(null);
-  const [viewMode, setViewMode] = useState("3d");
   const [modeMorph, setModeMorph] = useState(null);
   const [size, setSize] = useState({ width: 1200, height: 760 });
   const [autoRotation, setAutoRotation] = useState(0);
@@ -1091,7 +1074,7 @@ export default function App() {
   useEffect(() => {
     const shouldRotate3D =
       (!isMorphing && viewMode === "3d") || (isMorphing && modeMorph.to === "3d");
-    if (workingId || !shouldRotate3D || isPointerDown) {
+    if (surfaceMode !== "graph" || workingId || !shouldRotate3D || isPointerDown) {
       return undefined;
     }
     let frame = 0;
@@ -1107,10 +1090,10 @@ export default function App() {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [isMorphing, isPointerDown, modeMorph?.to, viewMode, workingId]);
+  }, [isMorphing, isPointerDown, modeMorph?.to, surfaceMode, viewMode, workingId]);
 
   useEffect(() => {
-    if (workingId || viewMode !== "2d" || isPointerDown || isMorphing) {
+    if (surfaceMode !== "graph" || workingId || viewMode !== "2d" || isPointerDown || isMorphing) {
       return undefined;
     }
     let frame = 0;
@@ -1126,7 +1109,7 @@ export default function App() {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [isMorphing, isPointerDown, viewMode, workingId]);
+  }, [isMorphing, isPointerDown, surfaceMode, viewMode, workingId]);
 
   useEffect(
     () => () => {
@@ -1914,10 +1897,27 @@ export default function App() {
   }
 
   function switchViewMode(nextMode) {
+    if (surfaceMode !== "graph") {
+      setSurfaceMode("graph");
+      if (nextMode === viewMode) {
+        return;
+      }
+    }
     if (nextMode === viewMode || isMorphing) {
       return;
     }
     setModeMorph({ from: viewMode, to: nextMode, progress: 0 });
+  }
+
+  function openListSurface() {
+    setSurfaceMode("list");
+    setContextMenu(null);
+  }
+
+  function openCalendarSurface(nextRange = calendarRange) {
+    setSurfaceMode("calendar");
+    setCalendarRange(nextRange);
+    setContextMenu(null);
   }
 
   function onWheel(event) {
@@ -2652,13 +2652,68 @@ export default function App() {
         </div>
         <button
           type="button"
-          className="dock-button"
-          onClick={() => switchViewMode(displayViewMode === "3d" ? "2d" : "3d")}
-          aria-label={displayViewMode === "3d" ? "Show 2D graph" : "Show 3D graph"}
-          title={displayViewMode === "3d" ? "2D view" : "3D view"}
+          className={`dock-button ${surfaceMode === "graph" && viewMode === "2d" ? "active" : ""}`}
+          onClick={() => switchViewMode("2d")}
+          aria-label="Show 2D graph"
+          title="2D view"
         >
-          {displayViewMode === "3d" ? <RingsIcon /> : <GlobeIcon />}
+          <RingsIcon />
         </button>
+        <button
+          type="button"
+          className={`dock-button ${surfaceMode === "graph" && viewMode === "3d" ? "active" : ""}`}
+          onClick={() => switchViewMode("3d")}
+          aria-label="Show 3D graph"
+          title="3D view"
+        >
+          <GlobeIcon />
+        </button>
+        <button
+          type="button"
+          className={`dock-button ${surfaceMode === "list" ? "active" : ""}`}
+          onClick={openListSurface}
+          aria-label="Show task list"
+          title="List view"
+        >
+          <span className="dock-glyph">L</span>
+        </button>
+        <div className={`dock-calendar ${surfaceMode === "calendar" ? "expanded" : ""}`}>
+          <button
+            type="button"
+            className={`dock-button ${surfaceMode === "calendar" ? "active" : ""}`}
+            onClick={() => openCalendarSurface()}
+            aria-label="Show calendar"
+            title="Calendar view"
+          >
+            <span className="dock-glyph">C</span>
+          </button>
+          <div className="dock-calendar-actions" aria-hidden={surfaceMode !== "calendar"}>
+            <button
+              type="button"
+              className={`dock-subaction dock-subicon ${calendarRange === "day" ? "active" : ""}`}
+              onClick={() => openCalendarSurface("day")}
+              title="Daily calendar"
+            >
+              <span>D</span>
+            </button>
+            <button
+              type="button"
+              className={`dock-subaction dock-subicon ${calendarRange === "week" ? "active" : ""}`}
+              onClick={() => openCalendarSurface("week")}
+              title="Weekly calendar"
+            >
+              <span>W</span>
+            </button>
+            <button
+              type="button"
+              className={`dock-subaction dock-subicon ${calendarRange === "month" ? "active" : ""}`}
+              onClick={() => openCalendarSurface("month")}
+              title="Monthly calendar"
+            >
+              <span>M</span>
+            </button>
+          </div>
+        </div>
         <button
           type="button"
           className={`dock-button ${leftPanel === "note-editor" ? "active" : ""}`}
@@ -2895,6 +2950,7 @@ export default function App() {
         </div>
       )}
 
+      {surfaceMode === "graph" ? (
       <section
         ref={shellRef}
         className={`sphere-area view-${displayViewMode} ${isDragging ? "dragging" : ""} ${searchState} ${leftPanel ? "panel-open" : ""}`}
@@ -3280,8 +3336,42 @@ export default function App() {
           </g>
         </svg>
       </section>
+      ) : surfaceMode === "list" ? (
+        <section
+          ref={shellRef}
+          className={`sphere-area surface-shell ${leftPanel ? "panel-open" : ""}`}
+          aria-label="Task list"
+        >
+          <TaskListSurface
+            graph={graph}
+            nodesById={nodesById}
+            selectedId={selectedId}
+            onSelectNode={toggleSelectedNode}
+          />
+        </section>
+      ) : (
+        <section
+          ref={shellRef}
+          className={`sphere-area surface-shell ${leftPanel ? "panel-open" : ""}`}
+          aria-label="Calendar"
+        >
+          <CalendarSurface
+            range={calendarRange}
+            anchorDate={calendarAnchorDate}
+            onPrev={() => setCalendarAnchorDate((value) => shiftCalendarAnchor(calendarRange, value, -1))}
+            onNext={() => setCalendarAnchorDate((value) => shiftCalendarAnchor(calendarRange, value, 1))}
+            onToday={() => setCalendarAnchorDate(new Date())}
+            onReconcile={() => void reconcileAppleCalendar(calendarQueryRange)}
+            reconciling={calendarReconciling}
+            status={appleCalendarStatus}
+            loading={calendarLoading}
+            events={appleCalendarEvents}
+            onSelectActivity={toggleSelectedNode}
+          />
+        </section>
+      )}
 
-      {contextMenu && (
+      {surfaceMode === "graph" && contextMenu && (
         <div
           className="context-menu"
           style={{ left: contextMenu.x, top: contextMenu.y }}

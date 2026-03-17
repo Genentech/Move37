@@ -198,6 +198,46 @@
   cursor: default;
 }
 
+.surface-shell {
+  cursor: default;
+  overflow: auto;
+}
+
+.surface-content {
+  min-height: 100%;
+  padding: 5rem 1.4rem 1.4rem;
+}
+
+.surface-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.surface-header h2 {
+  margin: 0.2rem 0 0;
+  font: 700 clamp(1.1rem, 2vw, 1.5rem) / 1.1 "Sora", "Avenir Next", sans-serif;
+}
+
+.surface-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.surface-banner {
+  margin: 0 0 1rem;
+  border: 1px solid #8cb4ff26;
+  border-radius: 0.5rem;
+  background: #0b172cb5;
+  color: #d7e8ff;
+  padding: 0.75rem 0.85rem;
+  font: 600 0.72rem/1.4 "IBM Plex Mono", "Courier New", monospace;
+  letter-spacing: 0.03em;
+}
+
 .sphere-area svg {
   width: 100%;
   height: 100%;
@@ -261,6 +301,14 @@
   gap: 0.42rem;
 }
 
+.dock-calendar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.42rem;
+}
+
 .dock-import-actions {
   position: absolute;
   right: calc(100% + 0.55rem);
@@ -276,6 +324,26 @@
 }
 
 .dock-import.expanded .dock-import-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
+}
+
+.dock-calendar-actions {
+  position: absolute;
+  right: calc(100% + 0.55rem);
+  top: 50%;
+  transform: translateY(-50%) scale(0.96);
+  display: grid;
+  gap: 0.42rem;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.dock-calendar.expanded .dock-calendar-actions {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(-50%) scale(1);
@@ -319,11 +387,27 @@
   height: 1rem;
 }
 
+.dock-glyph {
+  font: 700 0.75rem/1 "IBM Plex Mono", "Courier New", monospace;
+  letter-spacing: 0.06em;
+}
+
 .dock-button-text {
   width: auto;
   min-width: 3.05rem;
   padding: 0 0.6rem;
   font-size: 0.68rem;
+}
+
+.dock-subicon {
+  min-width: 2.1rem;
+  width: 2.1rem;
+  padding: 0;
+}
+
+.dock-subicon.active {
+  border-color: #9fe8ff7a;
+  background: #153761f0;
 }
 
 .dock-subaction {
@@ -458,6 +542,157 @@
 
 .edge-ribbon.edge-moving {
   transition: opacity 220ms ease, filter 220ms ease;
+}
+
+.task-list-grid {
+  display: grid;
+  gap: 0.7rem;
+  max-width: min(56rem, calc(100vw - 2.8rem));
+}
+
+.task-branch {
+  border: 1px solid #8cb4ff24;
+  border-radius: 0.6rem;
+  background: #0b172cb5;
+  overflow: hidden;
+}
+
+.task-summary {
+  list-style: none;
+}
+
+.task-summary::-webkit-details-marker {
+  display: none;
+}
+
+.task-title-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border: 0;
+  background: transparent;
+  color: #eef6ff;
+  padding: 0.8rem 0.9rem;
+  cursor: pointer;
+  font: 600 0.84rem/1.3 "IBM Plex Sans", "Avenir Next", sans-serif;
+  text-align: left;
+}
+
+.task-summary.selected .task-title-button {
+  background: #153761b3;
+}
+
+.task-summary-meta {
+  color: #95add0;
+  font: 700 0.62rem/1 "IBM Plex Mono", "Courier New", monospace;
+  text-transform: uppercase;
+}
+
+.task-branch-body {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0 0.9rem 0.9rem;
+}
+
+.task-children {
+  display: grid;
+  gap: 0.6rem;
+  padding-left: 0.8rem;
+  border-left: 1px solid #8cb4ff1f;
+}
+
+.task-notes,
+.task-empty {
+  margin: 0;
+  color: #c5d8f5;
+  font: 500 0.76rem/1.45 "IBM Plex Sans", "Avenir Next", sans-serif;
+}
+
+.calendar-columns {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.calendar-columns.week {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.calendar-columns.single {
+  grid-template-columns: minmax(0, 24rem);
+}
+
+.calendar-column,
+.calendar-month-cell {
+  border: 1px solid #8cb4ff24;
+  border-radius: 0.6rem;
+  background: #0b172cb5;
+  overflow: hidden;
+}
+
+.calendar-column header,
+.calendar-month-cell header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem;
+  border-bottom: 1px solid #8cb4ff1b;
+  color: #e8f2ff;
+}
+
+.calendar-column header p {
+  margin: 0;
+  color: #95add0;
+  font: 700 0.62rem/1 "IBM Plex Mono", "Courier New", monospace;
+  text-transform: uppercase;
+}
+
+.calendar-column-body,
+.calendar-month-events {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.75rem;
+}
+
+.calendar-event {
+  display: grid;
+  gap: 0.18rem;
+  width: 100%;
+  border: 1px solid #8cb4ff22;
+  border-radius: 0.48rem;
+  background: #102244c9;
+  color: #eef6ff;
+  padding: 0.55rem 0.6rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.calendar-event.managed {
+  border-color: #8cffcd5f;
+  background: #11302bbd;
+}
+
+.calendar-event strong {
+  font: 600 0.74rem/1.25 "IBM Plex Sans", "Avenir Next", sans-serif;
+}
+
+.calendar-event span,
+.calendar-overflow {
+  color: #95add0;
+  font: 700 0.58rem/1.1 "IBM Plex Mono", "Courier New", monospace;
+  text-transform: uppercase;
+}
+
+.calendar-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.calendar-month-cell {
+  min-height: 8rem;
 }
 
 .node-halo {
@@ -1332,6 +1567,13 @@ button.chip {
   }
 }
 
+@media (max-width: 1100px) {
+  .calendar-columns.week,
+  .calendar-month-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 780px) {
   .topbar {
     align-items: center;
@@ -1364,6 +1606,18 @@ button.chip {
   }
 
   .dock-import.expanded .dock-import-actions {
+    transform: translateX(-50%) scale(1);
+  }
+
+  .dock-calendar-actions {
+    right: auto;
+    left: 50%;
+    top: auto;
+    bottom: calc(100% + 0.5rem);
+    transform: translateX(-50%) scale(0.96);
+  }
+
+  .dock-calendar.expanded .dock-calendar-actions {
     transform: translateX(-50%) scale(1);
   }
 
@@ -1402,5 +1656,14 @@ button.chip {
 
   .uri-search.expanded .uri-search-panel {
     width: min(16rem, calc(100vw - 5rem));
+  }
+
+  .surface-content {
+    padding-inline: 0.9rem;
+  }
+
+  .calendar-columns.week,
+  .calendar-month-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
