@@ -40,4 +40,31 @@ describe("Move37Client", () => {
 
     await expect(client.getGraph()).rejects.toBeInstanceOf(ApiError);
   });
+
+  it("posts URL note imports as JSON", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ notes: [], graph: { graphId: 1, version: 1, nodes: [], dependencies: [], schedules: [] } }),
+    }));
+    const client = new Move37Client({
+      baseUrl: "http://localhost:8080",
+      token: "token-123",
+      fetchImpl,
+    });
+
+    await client.importNoteFromUrl({ url: "https://example.com/reference.txt" });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "http://localhost:8080/v1/notes/import-url",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-123",
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({ url: "https://example.com/reference.txt" }),
+      }),
+    );
+  });
 });

@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
+from urllib.parse import urlparse, unquote
 
+import httpx
 from sqlalchemy.orm import sessionmaker
 
 from move37.default_graph import build_default_graph
@@ -174,6 +176,30 @@ class NoteService:
                 "graph": graph,
             }
 
+    def import_text_from_url(self, subject: str, url: str) -> dict[str, object]:
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("Enter a valid http or https URL.")
+
+        with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+            response = client.get(url)
+            response.raise_for_status()
+
+        content_type = (response.headers.get("content-type") or "").lower()
+        filename = self._filename_from_url(str(response.url))
+        looks_like_text = content_type.startswith("text/plain") or filename.lower().endswith(".txt")
+        if not looks_like_text:
+            raise ValueError("URL must return plain text data.")
+
+        if "html" in content_type:
+            raise ValueError("HTML pages cannot be imported as notes.")
+
+        content = response.text
+        return self.import_texts(
+            subject,
+            [ImportTextPayload(filename=filename, content=content)],
+        )
+
     def decode_text_file(self, filename: str, content: bytes) -> ImportTextPayload:
         lowered = filename.lower()
         if not lowered.endswith(".txt"):
@@ -196,6 +222,14 @@ class NoteService:
         if base.lower().endswith(".txt"):
             base = base[:-4]
         return base or "Untitled note"
+
+    @staticmethod
+    def _filename_from_url(url: str) -> str:
+        path = unquote(urlparse(url).path or "")
+        base = path.rsplit("/", 1)[-1].strip()
+        if not base:
+            return "imported-note.txt"
+        return base
 
     def _get_or_seed_graph(
         self,

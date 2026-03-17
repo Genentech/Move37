@@ -134,6 +134,14 @@ class NoteImportInput(BaseModel):
     files: list[NoteImportItemInput]
 
 
+class NoteImportUrlInput(BaseModel):
+    """REST note import-from-url payload."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str = Field(min_length=1)
+
+
 class NoteImportResponse(BaseModel):
     """Imported notes payload."""
 

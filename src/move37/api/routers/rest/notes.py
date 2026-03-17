@@ -10,6 +10,7 @@ from httpx import HTTPError
 from move37.api.schemas import (
     NoteCreateResponse,
     NoteImportResponse,
+    NoteImportUrlInput,
     NoteListOutput,
     NoteOutput,
     NotePatch,
@@ -105,6 +106,22 @@ async def import_notes(
             for file in files
         ]
         response = services.note_service.import_texts(subject, payloads)
+    except Exception as error:  # pragma: no cover
+        _handle_note_error(error)
+    return NoteImportResponse(
+        notes=[NoteOutput(**note) for note in response["notes"]],
+        graph=response["graph"],
+    )
+
+
+@router.post("/notes/import-url", response_model=NoteImportResponse)
+def import_note_from_url(
+    payload: NoteImportUrlInput,
+    subject: Annotated[str, Depends(get_current_subject)],
+    services: Annotated[ServiceContainer, Depends(get_service_container)],
+) -> NoteImportResponse:
+    try:
+        response = services.note_service.import_text_from_url(subject, payload.url)
     except Exception as error:  # pragma: no cover
         _handle_note_error(error)
     return NoteImportResponse(

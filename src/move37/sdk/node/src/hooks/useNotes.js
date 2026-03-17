@@ -72,6 +72,7 @@ export function useNotes(options) {
     createNote: (payload) => runMutation(() => client.createNote(payload)),
     updateNote: (noteId, payload) => runMutation(() => client.updateNote(noteId, payload)),
     importTxtNotes: (formData) => runMutation(() => client.importTxtNotes(formData)),
+    importNoteFromUrl: (payload) => runMutation(() => client.importNoteFromUrl(payload)),
     searchNotes: (payload) => client.searchNotes(payload),
   };
 }

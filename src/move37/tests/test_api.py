@@ -3,7 +3,9 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
+import httpx
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 
@@ -99,6 +101,67 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(titles, {"morning", "training"})
         note_node_titles = {node["title"] for node in payload["graph"]["nodes"] if node["kind"] == "note"}
         self.assertTrue({"morning", "training"}.issubset(note_node_titles))
+
+    @patch("move37.services.notes.httpx.Client")
+    def test_import_url_creates_note_from_plain_text(self, client_cls) -> None:
+        request = httpx.Request("GET", "https://example.com/reference.txt")
+        response = httpx.Response(
+            200,
+            headers={"content-type": "text/plain; charset=utf-8"},
+            text="linked note body",
+            request=request,
+        )
+        client = client_cls.return_value.__enter__.return_value
+        client.get.return_value = response
+
+        api_response = self.client.post(
+            "/v1/notes/import-url",
+            headers={"Authorization": "Bearer test-token"},
+            json={"url": "https://example.com/reference.txt"},
+        )
+
+        self.assertEqual(api_response.status_code, 200)
+        payload = api_response.json()
+        self.assertEqual(len(payload["notes"]), 1)
+        self.assertEqual(payload["notes"][0]["title"], "reference")
+        note_nodes = [node for node in payload["graph"]["nodes"] if node["kind"] == "note"]
+        self.assertEqual(len(note_nodes), 1)
+        self.assertEqual(note_nodes[0]["title"], "reference")
+
+    @patch("move37.services.notes.httpx.Client")
+    def test_import_url_rejects_non_text_response(self, client_cls) -> None:
+        request = httpx.Request("GET", "https://example.com/index")
+        response = httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            text='{"ok":true}',
+            request=request,
+        )
+        client = client_cls.return_value.__enter__.return_value
+        client.get.return_value = response
+
+        api_response = self.client.post(
+            "/v1/notes/import-url",
+            headers={"Authorization": "Bearer test-token"},
+            json={"url": "https://example.com/index"},
+        )
+
+        self.assertEqual(api_response.status_code, 400)
+        self.assertEqual(api_response.json()["detail"], "URL must return plain text data.")
+
+    @patch("move37.services.notes.httpx.Client")
+    def test_import_url_surfaces_fetch_failures(self, client_cls) -> None:
+        client = client_cls.return_value.__enter__.return_value
+        client.get.side_effect = httpx.ConnectError("boom")
+
+        api_response = self.client.post(
+            "/v1/notes/import-url",
+            headers={"Authorization": "Bearer test-token"},
+            json={"url": "https://example.com/reference.txt"},
+        )
+
+        self.assertEqual(api_response.status_code, 503)
+        self.assertEqual(api_response.json()["detail"], "AI service unavailable.")
 
 
 if __name__ == "__main__":
