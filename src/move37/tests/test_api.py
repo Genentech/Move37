@@ -249,7 +249,7 @@ class ApiTest(unittest.TestCase):
         response = self.client.post(
             "/v1/notes/import",
             headers={"Authorization": "Bearer test-token"},
-            files=[("files", ("notes.txt", b"\x80\x81\x82\x83", "text/plain"))],
+            files=[("files", ("notes.txt", b"\x80", "text/plain"))],
         )
 
         self.assertEqual(response.status_code, 400)
