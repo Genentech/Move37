@@ -64,6 +64,15 @@ class ApiTest(unittest.TestCase):
         self.assertGreater(len(payload["nodes"]), 0)
         self.assertIn("graphId", payload)
 
+    def test_rest_chat_routes_are_not_exposed(self) -> None:
+        response = self.client.post(
+            "/v1/chat/sessions",
+            headers={"Authorization": "Bearer test-token"},
+            json={"title": "Notes chat"},
+        )
+
+        self.assertEqual(response.status_code, 404)
+
     def test_apple_calendar_status_returns_service_status(self) -> None:
         self.client.app.state.services.apple_calendar_service.get_status = lambda: {
             "enabled": True,

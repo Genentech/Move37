@@ -91,25 +91,6 @@ export class Move37Client {
     return this.request("POST", "/v1/notes/search", { body: payload });
   }
 
-  createChatSession(payload = {}) {
-    this.logOperation("createChatSession", { title: payload?.title });
-    return this.request("POST", "/v1/chat/sessions", { body: payload });
-  }
-
-  getChatSession(sessionId) {
-    return this.request("GET", `/v1/chat/sessions/${encodeURIComponent(sessionId)}`);
-  }
-
-  sendChatMessage(sessionId, payload) {
-    this.logOperation("sendChatMessage", {
-      sessionId,
-      messageLength: typeof payload?.content === "string" ? payload.content.length : undefined,
-    });
-    return this.request("POST", `/v1/chat/sessions/${encodeURIComponent(sessionId)}/messages`, {
-      body: payload,
-    });
-  }
-
   insertBetween(activityId, payload) {
     this.logOperation("insertBetween", {
       activityId,

@@ -1170,8 +1170,7 @@
   min-height: 14rem;
 }
 
-.import-list,
-.chat-thread {
+.import-list {
   display: grid;
   gap: 0.5rem;
   max-height: 24rem;
@@ -1179,8 +1178,7 @@
   padding-right: 0.15rem;
 }
 
-.import-item,
-.chat-message {
+.import-item {
   border: 1px solid #8ec8ff24;
   background: #102040bf;
   border-radius: 0.42rem;
@@ -1191,33 +1189,6 @@
   display: flex;
   justify-content: space-between;
   gap: 0.5rem;
-}
-
-.chat-panel {
-  grid-template-rows: auto minmax(0, 1fr) auto;
-}
-
-.chat-message p {
-  margin: 0;
-}
-
-.chat-message.role-user {
-  background: #16325ac4;
-}
-
-.chat-citations {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.32rem;
-  margin-top: 0.48rem;
-}
-
-.chat-citations .chip {
-  cursor: pointer;
-}
-
-.chat-form .workspace-grow textarea {
-  min-height: 6rem;
 }
 
 .url-import-backdrop {
