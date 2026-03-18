@@ -216,6 +216,47 @@ class ApiTest(unittest.TestCase):
 
         self.assertEqual(api_response.status_code, 503)
         self.assertEqual(api_response.json()["detail"], "AI service unavailable.")
+        def test_get_note_returns_404_for_missing_note(self) -> None:
+        response = self.client.get(
+            "/v1/notes/99999",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Note not found.")
+
+    def test_patch_note_returns_404_for_missing_note(self) -> None:
+        response = self.client.patch(
+            "/v1/notes/99999",
+            headers={"Authorization": "Bearer test-token"},
+            json={"title": "Updated title"},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Note not found.")
+
+    def test_import_rejects_non_txt_file(self) -> None:
+        response = self.client.post(
+            "/v1/notes/import",
+            headers={"Authorization": "Bearer test-token"},
+            files=[("files", ("data.csv", b"a,b,c", "text/csv"))],
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Only .txt files are supported.")
+
+    def test_import_rejects_unsupported_encoding(self) -> None:
+        response = self.client.post(
+            "/v1/notes/import",
+            headers={"Authorization": "Bearer test-token"},
+            files=[("files", ("notes.txt", b"\x80\x81\x82\x83", "text/plain"))],
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["detail"],
+            "Unsupported text encoding. Use UTF-8, UTF-8 BOM, or UTF-16.",
+        )
 
 
 if __name__ == "__main__":
