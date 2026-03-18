@@ -1,3 +1,493 @@
+import { memo, useDeferredValue, useEffect, useMemo, useState } from "react";
+
+const TASK_TITLE_COLLATOR = new Intl.Collator("en", {
+  numeric: true,
+  sensitivity: "base",
+});
+const TASK_DATE_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+});
+
+function compareTaskNodes(left, right) {
+  const leftWorking = left.workStartedAt ? 0 : 1;
+  const rightWorking = right.workStartedAt ? 0 : 1;
+  if (leftWorking !== rightWorking) {
+    return leftWorking - rightWorking;
+  }
+
+  const leftScheduled = left.startDate ? 0 : 1;
+  const rightScheduled = right.startDate ? 0 : 1;
+  if (leftScheduled !== rightScheduled) {
+    return leftScheduled - rightScheduled;
+  }
+
+  if (left.startDate && right.startDate) {
+    const startDateCompare = left.startDate.localeCompare(right.startDate);
+    if (startDateCompare !== 0) {
+      return startDateCompare;
+    }
+  }
+
+  if (left.bestBefore && right.bestBefore) {
+    const dueDateCompare = left.bestBefore.localeCompare(right.bestBefore);
+    if (dueDateCompare !== 0) {
+      return dueDateCompare;
+    }
+  }
+
+  return TASK_TITLE_COLLATOR.compare(left.title || "", right.title || "");
+}
+
+function formatTaskDate(value) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return TASK_DATE_FORMATTER.format(date);
+}
+
+function summarizeNotes(value) {
+  const normalized = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) {
+    return "";
+  }
+  return normalized.length > 140 ? `${normalized.slice(0, 139).trimEnd()}…` : normalized;
+}
+
+function setsEqual(left, right) {
+  if (left.size !== right.size) {
+    return false;
+  }
+  for (const value of left) {
+    if (!right.has(value)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function buildTaskTree(graph, nodesById) {
+  const parentMap = new Map(graph.nodes.map((node) => [node.id, []]));
+  const childMap = new Map(graph.nodes.map((node) => [node.id, []]));
+
+  graph.dependencies.forEach((edge) => {
+    if (!parentMap.has(edge.childId) || !childMap.has(edge.parentId)) {
+      return;
+    }
+    parentMap.get(edge.childId).push(edge.parentId);
+    childMap.get(edge.parentId).push(edge.childId);
+  });
+
+  childMap.forEach((children, nodeId) => {
+    children.sort((leftId, rightId) =>
+      compareTaskNodes(nodesById.get(leftId) || {}, nodesById.get(rightId) || {}),
+    );
+    childMap.set(nodeId, children);
+  });
+
+  const roots = graph.nodes
+    .filter((node) => (parentMap.get(node.id) || []).length === 0)
+    .sort(compareTaskNodes)
+    .map((node) => node.id);
+
+  const searchTextById = new Map(
+    graph.nodes.map((node) => [
+      node.id,
+      [node.title, node.notes, node.startDate, node.bestBefore]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase(),
+    ]),
+  );
+
+  const descendantIdsByNodeId = new Map();
+
+  function collectDescendants(nodeId, path = new Set()) {
+    if (descendantIdsByNodeId.has(nodeId)) {
+      return descendantIdsByNodeId.get(nodeId);
+    }
+    if (path.has(nodeId)) {
+      return new Set();
+    }
+
+    const nextPath = new Set(path);
+    nextPath.add(nodeId);
+    const descendants = new Set();
+
+    (childMap.get(nodeId) || []).forEach((childId) => {
+      descendants.add(childId);
+      collectDescendants(childId, nextPath).forEach((nestedId) => descendants.add(nestedId));
+    });
+
+    descendantIdsByNodeId.set(nodeId, descendants);
+    return descendants;
+  }
+
+  const descendantCountById = new Map(
+    graph.nodes.map((node) => [node.id, collectDescendants(node.id).size]),
+  );
+
+  return {
+    parentMap,
+    childMap,
+    roots,
+    searchTextById,
+    descendantCountById,
+    activeCount: graph.nodes.filter((node) => node.workStartedAt).length,
+    scheduledCount: graph.nodes.filter((node) => node.startDate).length,
+  };
+}
+
+function collectSelectedLineage(selectedId, parentMap) {
+  if (!selectedId) {
+    return new Set();
+  }
+  const lineage = new Set();
+  const queue = [selectedId];
+
+  while (queue.length) {
+    const currentId = queue.shift();
+    if (!currentId || lineage.has(currentId)) {
+      continue;
+    }
+    lineage.add(currentId);
+    (parentMap.get(currentId) || []).forEach((parentId) => {
+      if (!lineage.has(parentId)) {
+        queue.push(parentId);
+      }
+    });
+  }
+
+  return lineage;
+}
+
+function findMatchingTaskIds(roots, childMap, searchTextById, query) {
+  if (!query) {
+    return null;
+  }
+
+  const matches = new Set();
+
+  function branchMatches(nodeId, path) {
+    if (path.has(nodeId)) {
+      return false;
+    }
+    const nextPath = new Set(path);
+    nextPath.add(nodeId);
+    const selfMatches = searchTextById.get(nodeId)?.includes(query) || false;
+    let childMatches = false;
+
+    (childMap.get(nodeId) || []).forEach((childId) => {
+      if (branchMatches(childId, nextPath)) {
+        childMatches = true;
+      }
+    });
+
+    if (selfMatches || childMatches) {
+      matches.add(nodeId);
+      return true;
+    }
+    return false;
+  }
+
+  roots.forEach((rootId) => {
+    branchMatches(rootId, new Set());
+  });
+
+  return matches;
+}
+
+const TaskListRow = memo(function TaskListRow({
+  row,
+  selectedId,
+  onToggle,
+  onSelectNode,
+  onCreateChild,
+}) {
+  const {
+    node,
+    depth,
+    hasChildren,
+    isExpanded,
+    descendantCount,
+    isRoot,
+  } = row;
+  const notes = summarizeNotes(node.notes);
+  const startLabel = node.startDate ? `Start ${formatTaskDate(node.startDate)}` : "No start";
+  const dueLabel = node.bestBefore ? `Due ${formatTaskDate(node.bestBefore)}` : "";
+
+  return (
+    <article
+      role="listitem"
+      className={[
+        "task-row",
+        selectedId === node.id ? "selected" : "",
+        node.workStartedAt ? "working" : "",
+        isRoot ? "root" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={{ "--task-depth": depth }}
+    >
+      <div className="task-row-indent">
+        <span className="task-row-rail" aria-hidden="true" />
+        {hasChildren ? (
+          <button
+            type="button"
+            className={`task-toggle ${isExpanded ? "open" : ""}`}
+            onClick={() => onToggle(node.id)}
+            aria-label={isExpanded ? "Collapse branch" : "Expand branch"}
+          >
+            <span className="task-toggle-glyph" />
+          </button>
+        ) : (
+          <span className="task-leaf-glyph" aria-hidden="true" />
+        )}
+      </div>
+      <button type="button" className="task-row-main" onClick={() => onSelectNode(node.id)}>
+        <span className="task-row-kicker">{isRoot ? "root activity" : `level ${depth}`}</span>
+        <strong>{node.title}</strong>
+        {notes ? <span className="task-row-notes">{notes}</span> : null}
+      </button>
+      <div className="task-row-meta">
+        {node.workStartedAt ? <span className="task-pill working">Working</span> : null}
+        <span className={`task-pill ${node.startDate ? "scheduled" : "quiet"}`}>{startLabel}</span>
+        {dueLabel ? <span className="task-pill due">{dueLabel}</span> : null}
+        {descendantCount ? (
+          <span className="task-pill neutral">{descendantCount} downstream</span>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        className="task-row-action"
+        onClick={() => onCreateChild(node.id)}
+        aria-label={`Add child activity to ${node.title}`}
+        title="Add child activity"
+      >
+        Child
+      </button>
+    </article>
+  );
+});
+
+function TaskListSurfaceInner({
+  graph,
+  nodesById,
+  selectedId,
+  onSelectNode,
+  onCreateRoot,
+  onCreateChild,
+}) {
+  const [searchValue, setSearchValue] = useState("");
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+  const deferredSearch = useDeferredValue(searchValue.trim().toLowerCase());
+
+  const taskTree = useMemo(() => buildTaskTree(graph, nodesById), [graph, nodesById]);
+  const selectedLineage = useMemo(
+    () => collectSelectedLineage(selectedId, taskTree.parentMap),
+    [selectedId, taskTree.parentMap],
+  );
+
+  useEffect(() => {
+    setExpandedIds((current) => {
+      const next = new Set([...current].filter((id) => nodesById.has(id)));
+      taskTree.roots.forEach((id) => next.add(id));
+      selectedLineage.forEach((id) => next.add(id));
+      return setsEqual(current, next) ? current : next;
+    });
+  }, [nodesById, selectedLineage, taskTree.roots]);
+
+  const matchingIds = useMemo(
+    () =>
+      findMatchingTaskIds(
+        taskTree.roots,
+        taskTree.childMap,
+        taskTree.searchTextById,
+        deferredSearch,
+      ),
+    [deferredSearch, taskTree.childMap, taskTree.roots, taskTree.searchTextById],
+  );
+
+  const visibleRows = useMemo(() => {
+    const rows = [];
+    const forceExpand = Boolean(deferredSearch);
+
+    function visit(nodeId, depth, rootId, path) {
+      if (path.has(nodeId)) {
+        return;
+      }
+      if (matchingIds && !matchingIds.has(nodeId)) {
+        return;
+      }
+
+      const node = nodesById.get(nodeId);
+      if (!node) {
+        return;
+      }
+
+      const children = (taskTree.childMap.get(nodeId) || []).filter(
+        (childId) => !matchingIds || matchingIds.has(childId),
+      );
+      const isExpanded = forceExpand || expandedIds.has(nodeId);
+
+      rows.push({
+        id: nodeId,
+        node,
+        depth,
+        isRoot: rootId === nodeId,
+        hasChildren: children.length > 0,
+        isExpanded,
+        descendantCount: taskTree.descendantCountById.get(nodeId) || 0,
+      });
+
+      if (!isExpanded) {
+        return;
+      }
+
+      const nextPath = new Set(path);
+      nextPath.add(nodeId);
+      children.forEach((childId) => {
+        visit(childId, depth + 1, rootId, nextPath);
+      });
+    }
+
+    taskTree.roots.forEach((rootId) => {
+      visit(rootId, 0, rootId, new Set());
+    });
+
+    return rows;
+  }, [
+    deferredSearch,
+    expandedIds,
+    matchingIds,
+    nodesById,
+    taskTree.childMap,
+    taskTree.descendantCountById,
+    taskTree.roots,
+  ]);
+
+  const visibleNodeCount = matchingIds ? matchingIds.size : graph.nodes.length;
+
+  function toggleExpanded(nodeId) {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      if (next.has(nodeId)) {
+        next.delete(nodeId);
+      } else {
+        next.add(nodeId);
+      }
+      return next;
+    });
+  }
+
+  function expandAll() {
+    setExpandedIds(new Set(graph.nodes.map((node) => node.id)));
+  }
+
+  function collapseToRoots() {
+    const next = new Set(taskTree.roots);
+    selectedLineage.forEach((id) => next.add(id));
+    setExpandedIds(next);
+  }
+
+  return (
+    <div className="surface-content task-list-surface">
+      <div className="task-list-hero">
+        <div className="task-list-hero-copy">
+          <p className="eyebrow">TASKS</p>
+          <h2>Activities ledger</h2>
+          <p className="task-list-subtitle">
+            Faster tree navigation, cleaner hierarchy, and quick access to what is active now.
+          </p>
+        </div>
+        <div className="surface-actions">
+          <button type="button" className="ghost-button" onClick={onCreateRoot}>
+            ADD ROOT
+          </button>
+        </div>
+      </div>
+
+      <div className="task-list-stats" aria-label="Activity list summary">
+        <article className="task-stat">
+          <span className="task-stat-label">Visible</span>
+          <strong>{visibleNodeCount}</strong>
+        </article>
+        <article className="task-stat">
+          <span className="task-stat-label">Roots</span>
+          <strong>{taskTree.roots.length}</strong>
+        </article>
+        <article className="task-stat">
+          <span className="task-stat-label">Scheduled</span>
+          <strong>{taskTree.scheduledCount}</strong>
+        </article>
+        <article className="task-stat">
+          <span className="task-stat-label">Working</span>
+          <strong>{taskTree.activeCount}</strong>
+        </article>
+      </div>
+
+      <div className="task-list-toolbar">
+        <label className="task-search-field">
+          <span>Filter activities</span>
+          <input
+            type="search"
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+            placeholder="Search title, notes, or dates"
+          />
+        </label>
+        <div className="task-toolbar-actions">
+          <button type="button" className="ghost-button" onClick={expandAll}>
+            EXPAND ALL
+          </button>
+          <button type="button" className="ghost-button" onClick={collapseToRoots}>
+            ROOTS ONLY
+          </button>
+        </div>
+      </div>
+
+      <div className="task-list-grid" role="list">
+        {visibleRows.length ? (
+          visibleRows.map((row) => (
+            <TaskListRow
+              key={row.id}
+              row={row}
+              selectedId={selectedId}
+              onToggle={toggleExpanded}
+              onSelectNode={onSelectNode}
+              onCreateChild={onCreateChild}
+            />
+          ))
+        ) : (
+          <div className="task-list-empty">
+            <p className="task-empty">
+              {deferredSearch
+                ? "No activities match this filter."
+                : "No activities yet. Add a root to start the graph."}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function taskListPropsEqual(previous, next) {
+  return (
+    previous.graph === next.graph &&
+    previous.nodesById === next.nodesById &&
+    previous.selectedId === next.selectedId
+  );
+}
+
+export const TaskListSurface = memo(TaskListSurfaceInner, taskListPropsEqual);
+
 function startOfDay(value) {
   const next = new Date(value);
   next.setHours(0, 0, 0, 0);
@@ -54,134 +544,6 @@ export function shiftCalendarAnchor(range, anchorDate, direction) {
   return addDays(anchorDate, direction * 7);
 }
 
-function TaskListBranch({
-  node,
-  childMap,
-  nodesById,
-  path,
-  depth,
-  selectedId,
-  onSelectNode,
-  onCreateChild,
-}) {
-  const [open, setOpen] = useState(depth === 0);
-  const nextPath = new Set(path);
-  nextPath.add(node.id);
-  const children = (childMap.get(node.id) || [])
-    .map((childId) => nodesById.get(childId))
-    .filter(Boolean)
-    .sort((left, right) => left.title.localeCompare(right.title));
-
-  return (
-    <section className={`task-branch depth-${depth} ${open ? "open" : ""}`}>
-      <div className={`task-summary ${selectedId === node.id ? "selected" : ""}`}>
-        <button
-          type="button"
-          className={`task-toggle ${open ? "open" : ""}`}
-          onClick={() => setOpen((value) => !value)}
-          aria-label={open ? "Collapse branch" : "Expand branch"}
-        >
-          <span className="task-toggle-glyph" />
-        </button>
-        <button type="button" className="task-title-button" onClick={() => onSelectNode(node.id)}>
-          <span>{node.title}</span>
-          <span className="task-summary-meta">
-            {node.startDate ? node.startDate : "unscheduled"}
-          </span>
-        </button>
-        <button
-          type="button"
-          className="task-inline-action"
-          onClick={() => onCreateChild(node.id)}
-          aria-label={`Add child activity to ${node.title}`}
-          title="Add child activity"
-        >
-          +
-        </button>
-      </div>
-      <div className="task-branch-collapse">
-        <div className="task-branch-body">
-          {node.notes ? <p className="task-notes">{node.notes}</p> : null}
-          {children.length ? (
-            <div className="task-children">
-              {children.map((child) =>
-                nextPath.has(child.id) ? null : (
-                  <TaskListBranch
-                    key={`${node.id}:${child.id}`}
-                    node={child}
-                    childMap={childMap}
-                    nodesById={nodesById}
-                    path={nextPath}
-                    depth={depth + 1}
-                    selectedId={selectedId}
-                    onSelectNode={onSelectNode}
-                    onCreateChild={onCreateChild}
-                  />
-                ),
-              )}
-            </div>
-          ) : (
-            <p className="task-empty">No child tasks.</p>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-export function TaskListSurface({
-  graph,
-  nodesById,
-  selectedId,
-  onSelectNode,
-  onCreateRoot,
-  onCreateChild,
-}) {
-  const parentMap = new Map(graph.nodes.map((node) => [node.id, []]));
-  const childMap = new Map(graph.nodes.map((node) => [node.id, []]));
-  graph.dependencies.forEach((edge) => {
-    if (!parentMap.has(edge.childId) || !childMap.has(edge.parentId)) {
-      return;
-    }
-    parentMap.get(edge.childId).push(edge.parentId);
-    childMap.get(edge.parentId).push(edge.childId);
-  });
-  const roots = graph.nodes
-    .filter((node) => (parentMap.get(node.id) || []).length === 0)
-    .sort((left, right) => left.title.localeCompare(right.title));
-
-  return (
-    <div className="surface-content task-list-surface">
-      <div className="surface-header">
-        <div>
-          <p className="eyebrow">TASKS</p>
-          <h2>Dependency list</h2>
-        </div>
-        <div className="surface-actions">
-          <button type="button" className="ghost-button" onClick={onCreateRoot}>
-            ADD ROOT
-          </button>
-        </div>
-      </div>
-      <div className="task-list-grid">
-        {roots.map((node) => (
-          <TaskListBranch
-            key={node.id}
-            node={node}
-            childMap={childMap}
-            nodesById={nodesById}
-            path={new Set()}
-            depth={0}
-            selectedId={selectedId}
-            onSelectNode={onSelectNode}
-            onCreateChild={onCreateChild}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function EventChip({ event, onSelectActivity }) {
   return (
     <button
@@ -194,7 +556,14 @@ function EventChip({ event, onSelectActivity }) {
       }}
     >
       <strong>{event.title}</strong>
-      <span>{event.allDay ? "All day" : formatDayLabel(new Date(event.startsAt), { hour: "2-digit", minute: "2-digit" })}</span>
+      <span>
+        {event.allDay
+          ? "All day"
+          : formatDayLabel(new Date(event.startsAt), {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+      </span>
     </button>
   );
 }
@@ -253,13 +622,25 @@ export function CalendarSurface({
           <h2>{formatDayLabel(anchorDate, { month: "long", year: "numeric" })}</h2>
         </div>
         <div className="surface-actions">
-          <button type="button" className={`ghost-button ${range === "day" ? "active" : ""}`} onClick={() => onRangeChange("day")}>
+          <button
+            type="button"
+            className={`ghost-button ${range === "day" ? "active" : ""}`}
+            onClick={() => onRangeChange("day")}
+          >
             DAY
           </button>
-          <button type="button" className={`ghost-button ${range === "week" ? "active" : ""}`} onClick={() => onRangeChange("week")}>
+          <button
+            type="button"
+            className={`ghost-button ${range === "week" ? "active" : ""}`}
+            onClick={() => onRangeChange("week")}
+          >
             WEEK
           </button>
-          <button type="button" className={`ghost-button ${range === "month" ? "active" : ""}`} onClick={() => onRangeChange("month")}>
+          <button
+            type="button"
+            className={`ghost-button ${range === "month" ? "active" : ""}`}
+            onClick={() => onRangeChange("month")}
+          >
             MONTH
           </button>
           <button type="button" className="ghost-button" onClick={onPrev}>
@@ -271,7 +652,12 @@ export function CalendarSurface({
           <button type="button" className="ghost-button" onClick={onNext}>
             NEXT
           </button>
-          <button type="button" className="ghost-button" onClick={onReconcile} disabled={reconciling}>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={onReconcile}
+            disabled={reconciling}
+          >
             {reconciling ? "SYNCING" : "SYNC"}
           </button>
         </div>
@@ -282,7 +668,11 @@ export function CalendarSurface({
       {loading ? <div className="surface-banner">Loading calendar…</div> : null}
       {range === "day" ? (
         <div className="calendar-columns single">
-          <DayColumn day={startOfDay(anchorDate)} events={dayEvents} onSelectActivity={onSelectActivity} />
+          <DayColumn
+            day={startOfDay(anchorDate)}
+            events={dayEvents}
+            onSelectActivity={onSelectActivity}
+          />
         </div>
       ) : null}
       {range === "week" ? (
@@ -325,4 +715,3 @@ export function CalendarSurface({
     </div>
   );
 }
-import { useState } from "react";
