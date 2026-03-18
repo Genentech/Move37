@@ -1,7 +1,5 @@
 # Move37
 
-test
-
 Move37 is a prototype human operating system for the AI age: a system designed to help a person stay organized, protect focus, and make steady progress toward their goals. In this repo, it currently takes the form of:
 
 - a FastAPI backend for auth, activity-graph, notes, and chat workflows
