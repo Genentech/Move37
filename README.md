@@ -2,10 +2,10 @@
 
 Move37 is a prototype human operating system for the AI age: a system designed to help a person stay organized, protect focus, and make steady progress toward their goals. In this repo, it currently takes the form of:
 
-- a FastAPI backend for auth, activity-graph, notes, and chat workflows
+- a FastAPI backend for auth, activity-graph, notes, calendar, and MCP workflows
 - a React web app for exploring and editing the graph
 - a small Node SDK for client access to the API
-- MCP endpoints for agent-facing interactions
+- MCP endpoints for agent-facing interactions, including chat
 
 ## Features
 
@@ -14,9 +14,9 @@ The current codebase includes:
 - bearer-authenticated REST endpoints under `/v1/*`
 - an activity graph with dependency and schedule derivation rules
 - note creation, update, text import, and semantic note search
-- chat sessions backed by the AI service
 - a browser-based graph UI
 - a Node SDK with API client and React hooks
+- note-grounded chat through MCP clients such as ChatGPT
 - local Docker Compose infrastructure for the app stack
 
 ## Hiring Exercise

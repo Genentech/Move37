@@ -41,7 +41,7 @@ curl -s http://localhost:18080/v1/auth/me \
 
 If that fails, inspect the `api` container environment or any `.env` overrides you introduced.
 
-## Search or grounded chat returns `503`
+## Search or MCP grounded chat returns `503`
 
 The main API maps upstream AI failures to `503`.
 

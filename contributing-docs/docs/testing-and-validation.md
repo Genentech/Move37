@@ -79,7 +79,7 @@ If you change public API contracts, SDK-generation config, or developer docs:
 docker compose --profile docs up --build fern-docs
 ```
 
-If you change note search, embeddings, or grounded chat:
+If you change note search, embeddings, or grounded chat over MCP:
 
 - run the Python tests that still apply
 - start the AI path with `OPENAI_API_KEY`

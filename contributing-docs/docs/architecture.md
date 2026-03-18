@@ -8,11 +8,11 @@ description: Understand how the web app, SDK, API, AI service, worker, and infra
 
 Move37 is not a single process. It is a small system with a few important boundaries:
 
-- the main FastAPI API owns auth, graph mutations, notes CRUD, chat session persistence, and MCP transport
+- the main FastAPI API owns auth, graph mutations, notes CRUD, calendar sync, chat session persistence, and MCP transport
 - the internal AI service owns semantic note search and grounded answer generation
 - the notes worker owns embedding jobs and keeps Milvus in sync with notes stored in Postgres
 - the web app and Node SDK both talk to the main API, not directly to the AI service
-- MCP tools are another transport layer over the same service logic already used by REST
+- MCP tools are another transport layer over the same service logic already used by REST where REST exists
 
 ## Main API
 
@@ -39,9 +39,9 @@ REST routes currently cover four broad areas:
 - auth
 - graph
 - notes
-- chat
+- calendar
 
-MCP routes are exposed separately, but they still land on the same service layer underneath. If you change a service contract or persistence rule, think about both transports.
+MCP routes are exposed separately, and chat now lives there rather than in the browser or REST surface. If you change a service contract or persistence rule, think about both transports.
 
 ## Notes, embeddings, and chat
 
@@ -72,8 +72,8 @@ This path depends on:
 
 ### Grounded chat flow
 
-1. The client creates or loads a chat session through the main API.
-2. The client posts a chat message to the main API.
+1. An MCP client creates or loads a chat session through the main API.
+2. The MCP client posts a chat message to the main API.
 3. The main API forwards the message to `move37-ai`.
 4. `move37-ai` retrieves relevant note chunks from Milvus and runs the LangGraph answer flow.
 5. The assistant response is persisted back in Postgres.
@@ -95,7 +95,7 @@ That means a feature can “work” in one layer and still fail end to end if an
 
 `src/move37/sdk/node` is the current hand-written JavaScript SDK. It mirrors the REST API and also ships React hooks that the web app consumes.
 
-The web app is therefore a good reference for how the SDK is expected to feel, while the SDK is a good reference for which API routes are already treated as part of the client surface.
+The web app is therefore a good reference for how the SDK is expected to feel, while the SDK is a good reference for which API routes are already treated as part of the client surface. Chat is the exception: it is supported through MCP clients rather than the web app or REST SDK.
 
 ## Documentation split
 

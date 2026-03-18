@@ -20,7 +20,7 @@ The goal is not to describe every file. The goal is to help a new joiner answer 
 
 Move37 currently includes:
 
-- a FastAPI API for auth, graph, notes, chat, and MCP transport
+- a FastAPI API for auth, graph, notes, calendar, and MCP transport
 - a React and Vite web app
 - a hand-written Node SDK plus React hooks
 - an internal AI service for semantic note search and note-grounded chat
@@ -35,7 +35,7 @@ Move37 currently includes:
 
 1. Read [Local Development](./local-development.md) and choose the smallest setup path that matches the work you are doing.
 2. Read [Repository Map](./repository-map.md) to learn where code for your area lives.
-3. Read [Architecture](./architecture.md) to understand how requests, notes, search, chat, and MCP share the same backend services.
+3. Read [Architecture](./architecture.md) to understand how requests, notes, search, chat via MCP, and MCP share the same backend services.
 4. Read [Testing And Validation](./testing-and-validation.md) before you touch CI-sensitive code.
 
 ## Choose the right path
@@ -50,7 +50,7 @@ If you are changing the web UI:
 - start the web path in Compose
 - expect the web container to talk to the API through nginx
 
-If you are changing semantic note search, note embeddings, or chat:
+If you are changing semantic note search, note embeddings, or MCP chat:
 
 - you need the AI path, which includes the internal RAG service and the notes worker
 - you also need `OPENAI_API_KEY`

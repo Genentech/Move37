@@ -1097,6 +1097,58 @@
   color: #7f98bc;
 }
 
+.activity-overlay-form {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.activity-overlay-body {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  padding: 0.2rem 0;
+  overflow: auto;
+}
+
+.activity-overlay-header h2 {
+  margin: 0;
+  font: 700 1.08rem/1.2 "Sora", "Avenir Next", sans-serif;
+  color: #f2f9ff;
+}
+
+.activity-summary-list {
+  margin: 0;
+  display: grid;
+  gap: 0.18rem;
+}
+
+.activity-summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: baseline;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #8cb4ff1a;
+}
+
+.activity-summary-row dt,
+.activity-summary-row dd {
+  margin: 0;
+}
+
+.activity-summary-row dt {
+  color: #88a6cb;
+  font: 700 0.68rem/1.2 "IBM Plex Mono", "Courier New", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.activity-summary-row dd {
+  color: #eef6ff;
+  font: 500 0.94rem/1.45 "IBM Plex Sans", "Avenir Next", sans-serif;
+  text-align: left;
+}
+
 .notes-overlay-status {
   margin: 0;
   color: #9fb9db;
@@ -1714,6 +1766,11 @@ button.chip {
 
   .notes-overlay {
     width: 100vw;
+  }
+
+  .activity-summary-row {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
   }
 
   .url-import-popup {

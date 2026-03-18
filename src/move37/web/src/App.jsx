@@ -3586,76 +3586,58 @@ export default function App() {
       )}
 
       {!displayedSurfaceMode && selected && selectedDetails && selected.kind !== "note" && (
-        <aside className="details-modal details-sidepanel">
-          <div className="details-header">
-            <div>
-              <h2>{selected.title}</h2>
-              <p>{selected.notes || "No notes yet."}</p>
+        <aside className="notes-overlay activity-overlay" onClick={(event) => event.stopPropagation()}>
+          <div className="notes-overlay-form activity-overlay-form">
+            <div className="notes-overlay-toolbar">
+              <button
+                type="button"
+                className="overlay-icon-button"
+                onClick={() => setSelectedId(null)}
+                aria-label="Close activity details"
+                title="Close activity details"
+              >
+                <ExitIcon />
+              </button>
             </div>
-            <button type="button" className="ghost-button" onClick={() => setSelectedId(null)}>
-              CLOSE
-            </button>
+            <div className="activity-overlay-body">
+              <header className="activity-overlay-header">
+                <h2>{selected.title}</h2>
+              </header>
+              <dl className="activity-summary-list">
+                <div className="activity-summary-row">
+                  <dt>Level</dt>
+                  <dd>{selectedDetails.level}</dd>
+                </div>
+                <div className="activity-summary-row">
+                  <dt>Completion in</dt>
+                  <dd>
+                    {selectedDetails.parentCount} {selectedDetails.parentCount === 1 ? "parent" : "parents"} and{" "}
+                    {formatHours(selectedDetails.chainExpectedTime)}
+                  </dd>
+                </div>
+                <div className="activity-summary-row">
+                  <dt>Expected work</dt>
+                  <dd>{selected.expectedEffort ?? "n/a"}</dd>
+                </div>
+                <div className="activity-summary-row">
+                  <dt>Work</dt>
+                  <dd>{selected.realEffort ?? "n/a"}</dd>
+                </div>
+                <div className="activity-summary-row">
+                  <dt>Scheduled</dt>
+                  <dd>{selectedDetails.scheduled ? "yes" : "no"}</dd>
+                </div>
+                <div className="activity-summary-row">
+                  <dt>Start date</dt>
+                  <dd>{selected.startDate || "n/a"}</dd>
+                </div>
+                <div className="activity-summary-row">
+                  <dt>Latest by</dt>
+                  <dd>{selected.bestBefore || "n/a"}</dd>
+                </div>
+              </dl>
+            </div>
           </div>
-          <div className="metric-grid">
-            <div className="metric-card">
-              <span>Level</span>
-              <strong>level {selectedDetails.level}</strong>
-            </div>
-            <div className="metric-card">
-              <span>Scheduled</span>
-              <strong>{selectedDetails.scheduled ? "yes" : "no"}</strong>
-            </div>
-            <div className="metric-card">
-              <span>Parents</span>
-              <strong>{selectedDetails.parentCount}</strong>
-            </div>
-            <div className="metric-card">
-              <span>Chain time</span>
-              <strong>{formatHours(selectedDetails.chainExpectedTime)}</strong>
-            </div>
-            <div className="metric-card">
-              <span>Expected time</span>
-              <strong>{formatHours(selected.expectedTime)}</strong>
-            </div>
-            <div className="metric-card">
-              <span>Real time</span>
-              <strong>{formatHours(selectedDetails.liveRealTime)}</strong>
-            </div>
-          </div>
-          <p>
-            <strong>Start date:</strong> {selected.startDate || "n/a"}
-          </p>
-          <p>
-            <strong>Best before:</strong> {selected.bestBefore || "n/a"}
-          </p>
-          <p>
-            <strong>Expected effort:</strong> {selected.expectedEffort ?? "n/a"}
-          </p>
-          <p>
-            <strong>Real effort:</strong> {selected.realEffort ?? "n/a"}
-          </p>
-          <p>
-            <strong>Base level:</strong> {selectedDetails.baseLevel}
-          </p>
-          <div className="chips">
-            {selectedDetails.parents.map((id) => (
-              <span key={id} className="chip">
-                parent: {nodesById.get(id)?.title || id}
-              </span>
-            ))}
-            {selectedDetails.children.map((id) => (
-              <span key={id} className="chip">
-                child: {nodesById.get(id)?.title || id}
-              </span>
-            ))}
-            {selectedDetails.parents.length === 0 && (
-              <span className="chip">core activity</span>
-            )}
-          </div>
-          <p className="small">
-            Highlighted chain: {highlightedDependencyIds.size} nodes | direct dependency edges:{" "}
-            {selectedDependencyEdges.length} | scheduling rules: {selectedScheduleEdges.length}
-          </p>
         </aside>
       )}
 

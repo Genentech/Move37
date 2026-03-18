@@ -15,7 +15,7 @@ These are the directories a new contributor will touch most often:
 - `src/move37/tests`: current Python test suite
 - `src/move37/web`: React and Vite web app plus nginx container assets
 - `src/move37/sdk/node`: JavaScript SDK and React hooks
-- `src/move37/rag`: internal AI service for note search and grounded chat
+- `src/move37/rag`: internal AI service for note search and MCP-grounded chat
 - `src/move37/worker`: background note-embedding worker
 - `src/move37/db`: Postgres image and init scripts
 - `src/move37/alembic`: migrations

@@ -23,7 +23,7 @@ docker network create move37-network
 Environment variables to know about:
 
 - no extra env vars are required for basic graph, notes CRUD, and web smoke checks
-- `OPENAI_API_KEY` is required for semantic note search, note-grounded chat, and successful note embedding
+- `OPENAI_API_KEY` is required for semantic note search, MCP note-grounded chat, and successful note embedding
 - Langfuse variables are optional locally unless you want tracing to flow to the local Langfuse services
 - Docker Compose will read `.env` automatically if you create one at the repo root
 - `mv37-devtools` reads `.env` and `.env.local` when planning repository variables and secrets
@@ -73,7 +73,7 @@ curl -s http://localhost:18080/v1/graph -H "Authorization: Bearer ${MOVE37_TOKEN
 Use this when you are changing:
 
 - semantic note search
-- grounded chat
+- MCP grounded chat
 - note embedding behavior
 - worker logic
 - anything that depends on notes becoming searchable
