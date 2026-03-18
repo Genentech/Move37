@@ -1116,6 +1116,7 @@ export default function App() {
   const defaultViewport = useMemo(() => getDefaultViewport(size), [size]);
   const displayedSurfaceMode = surfaceClosingMode || (surfaceMode !== "graph" ? surfaceMode : null);
   const surfaceOverlayVisible = surfaceMode !== "graph" && !surfaceClosingMode;
+  const graphSuspended = displayedSurfaceMode != null;
   const levelSeed = levelSeedRef.current;
 
   function clearTransitionTimers() {
@@ -1216,7 +1217,7 @@ export default function App() {
   useEffect(() => {
     const shouldRotate3D =
       (!isMorphing && viewMode === "3d") || (isMorphing && modeMorph.to === "3d");
-    if (workingId || !shouldRotate3D || isPointerDown) {
+    if (graphSuspended || workingId || !shouldRotate3D || isPointerDown) {
       return undefined;
     }
     let frame = 0;
@@ -1232,10 +1233,10 @@ export default function App() {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [isMorphing, isPointerDown, modeMorph?.to, viewMode, workingId]);
+  }, [graphSuspended, isMorphing, isPointerDown, modeMorph?.to, viewMode, workingId]);
 
   useEffect(() => {
-    if (workingId || viewMode !== "2d" || isPointerDown || isMorphing) {
+    if (graphSuspended || workingId || viewMode !== "2d" || isPointerDown || isMorphing) {
       return undefined;
     }
     let frame = 0;
@@ -1401,7 +1402,7 @@ export default function App() {
   const layout = useMemo(() => computeGraphLayout(graph), [graph]);
 
   useEffect(() => {
-    if (selectedId || isTransitioning || graph.nodes.length === 0) {
+    if (graphSuspended || selectedId || isTransitioning || graph.nodes.length === 0) {
       setAmbientFlow({ dependencyEdgeIds: new Set() });
       return undefined;
     }
@@ -1414,7 +1415,7 @@ export default function App() {
     return () => {
       window.clearInterval(groupTimer);
     };
-  }, [graph, isTransitioning, layout, selectedId]);
+  }, [graph, graphSuspended, isTransitioning, layout, selectedId]);
 
   const nodesById = useMemo(
     () => new Map(graph.nodes.map((node) => [node.id, node])),
@@ -1753,6 +1754,16 @@ export default function App() {
       ...projectedNode,
     }));
   }, [displayProjected, renderState.nodes]);
+  const staticShellProjection = useMemo(
+    () => ({
+      centerX: size.width / 2 + panOffset.x,
+      centerY: size.height / 2 + panOffset.y,
+      radius: Math.min(size.width, size.height) * 0.39 * zoom,
+    }),
+    [panOffset, size.height, size.width, zoom],
+  );
+  const sphereProjection = graphSuspended ? staticShellProjection : displayProjected;
+  const showDynamicGraph = !graphSuspended;
 
   useEffect(() => {
     const active = graph.nodes.find((node) => node.workStartedAt);
@@ -3236,7 +3247,8 @@ export default function App() {
                 fill="#7ff4d724"
               />
             </marker>
-            {renderState.dependencyEdges.map((edge) => {
+            {showDynamicGraph
+              ? renderState.dependencyEdges.map((edge) => {
               const from = displayProjected.byId[edge.parentId];
               const to = displayProjected.byId[edge.childId];
               if (!from || !to) {
@@ -3258,13 +3270,14 @@ export default function App() {
                   <stop offset="100%" stopColor={innerPalette.nodeFill} stopOpacity="0.68" />
                 </linearGradient>
               );
-            })}
+                })
+              : null}
           </defs>
 
           <rect width={size.width} height={size.height} fill="url(#sphere-vignette)" data-background="true" />
           <ellipse
-            cx={displayProjected.centerX}
-            cy={displayProjected.centerY}
+            cx={sphereProjection.centerX}
+            cy={sphereProjection.centerY}
             rx={Math.min(size.width, size.height) * 0.44 * zoom}
             ry={Math.min(size.width, size.height) * 0.44 * zoom}
             className="sphere-glow"
@@ -3289,12 +3302,12 @@ export default function App() {
           <g className="graph-viewport">
             <g className="sphere-shells" aria-hidden="true">
               {[...renderState.levelShells].reverse().map((shell) => {
-                const shellRadius = Math.min(size.width, size.height) * 0.39 * zoom * shell.ratio;
+                const shellRadius = sphereProjection.radius * shell.ratio;
                 return (
                   <ellipse
                     key={shell.level}
-                    cx={displayProjected.centerX}
-                    cy={displayProjected.centerY}
+                    cx={sphereProjection.centerX}
+                    cy={sphereProjection.centerY}
                     rx={shellRadius}
                     ry={shellRadius}
                     className={["sphere-shell", shell.transitionState ? `shell-${shell.transitionState}` : ""]
@@ -3309,7 +3322,8 @@ export default function App() {
               })}
             </g>
 
-            <g className={`graph-layer ${nodesVisible && !displayedSurfaceMode ? "visible" : "hidden"}`}>
+            {showDynamicGraph ? (
+              <g className={`graph-layer ${nodesVisible ? "visible" : "hidden"}`}>
             {renderState.dependencyEdges.map((edge) => {
               const from = displayProjected.byId[edge.parentId];
               const to = displayProjected.byId[edge.childId];
@@ -3535,7 +3549,8 @@ export default function App() {
                 </g>
               );
             })}
-            </g>
+              </g>
+            ) : null}
           </g>
         </svg>
       </section>
