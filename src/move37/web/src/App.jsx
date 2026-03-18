@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useActivityGraph, useAppleCalendar, useNotes } from "@move37/sdk/react";
+import { useActivityGraph, useAppleCalendar, useChatSession, useNotes } from "@move37/sdk/react";
 import "./App.css";
 import {
   buildIndexes,
@@ -494,6 +494,16 @@ function NotesIcon() {
       <path d="M8.4 10.2h7.2" className="icon-map-line" />
       <path d="M8.4 13.4h7.2" className="icon-map-line" />
       <path d="M8.4 16.6h4.8" className="icon-map-line" />
+    </svg>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 6.4h14v9.8H9.4L5 19.6z" className="icon-map-outline" />
+      <path d="M8 10.3h8" className="icon-map-line" />
+      <path d="M8 13.4h5.6" className="icon-map-line" />
     </svg>
   );
 }
@@ -1048,6 +1058,13 @@ export default function App() {
     updateNote,
   } = useNotes(apiOptions);
   const {
+    session: chatSession,
+    createSession,
+    reload: reloadChatSession,
+    sendMessage,
+    loading: chatLoading,
+  } = useChatSession(apiOptions);
+  const {
     status: appleCalendarStatus,
     events: appleCalendarEvents,
     loading: calendarLoading,
@@ -1086,6 +1103,7 @@ export default function App() {
   const [importPopoverMode, setImportPopoverMode] = useState(null);
   const [urlImportValue, setUrlImportValue] = useState("");
   const [urlImportLoading, setUrlImportLoading] = useState(false);
+  const [chatInput, setChatInput] = useState("");
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [ambientFlow, setAmbientFlow] = useState({
@@ -2204,6 +2222,15 @@ export default function App() {
     animateViewport({ panOffset: defaultViewport.panOffset });
   }
 
+  function focusPanel() {
+    animateViewport({
+      panOffset: {
+        x: defaultViewport.panOffset.x + Math.round(size.width * 0.17),
+        y: defaultViewport.panOffset.y,
+      },
+    });
+  }
+
   function removeDraftNoteNode() {
     if (!draftNoteNodeId) {
       return;
@@ -2281,6 +2308,7 @@ export default function App() {
     setLeftPanel(null);
     setActiveNote(null);
     setNoteDraft("");
+    setChatInput("");
     recenterView();
   }
 
@@ -2379,6 +2407,26 @@ export default function App() {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
     } finally {
       setUrlImportLoading(false);
+    }
+  }
+
+  async function submitChat(event) {
+    event.preventDefault();
+    const content = chatInput.trim();
+    if (!content) {
+      return;
+    }
+    try {
+      let sessionId = chatSession?.id;
+      if (!sessionId) {
+        const created = await createSession({ title: "Notes chat" });
+        sessionId = created.id;
+      }
+      await sendMessage(sessionId, { content });
+      await reloadChatSession(sessionId);
+      setChatInput("");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
     }
   }
 
@@ -2877,6 +2925,9 @@ export default function App() {
               closeLeftPanel();
               return;
             }
+            if (leftPanel === "chat") {
+              closeLeftPanel();
+            }
             openDraftNoteWorkspace();
           }}
           aria-label="Open notes workspace"
@@ -2923,6 +2974,25 @@ export default function App() {
             onChange={handleBrowseInputChange}
           />
         </div>
+        <button
+          type="button"
+          className={`dock-button ${leftPanel === "chat" ? "active" : ""}`}
+          onClick={() => {
+            if (leftPanel === "chat") {
+              closeLeftPanel();
+              return;
+            }
+            setImportPopoverMode(null);
+            setIsImportMenuExpanded(false);
+            closeLeftPanel();
+            setLeftPanel("chat");
+            focusPanel();
+          }}
+          aria-label="Open notes chat"
+          title="Chat with notes"
+        >
+          <ChatIcon />
+        </button>
         {Math.abs(zoom - defaultViewport.zoom) > 0.001 ? (
           <button
             type="button"
@@ -2975,6 +3045,60 @@ export default function App() {
               onChange={(event) => setNoteDraft(event.target.value)}
               placeholder={`Title on the first line\n\nWrite the rest of the note below.`}
             />
+          </form>
+        </aside>
+      )}
+
+      {leftPanel === "chat" && (
+        <aside className="workspace-panel chat-panel" onClick={(event) => event.stopPropagation()}>
+          <div className="workspace-header">
+            <div>
+              <h2>Notes Chat</h2>
+              <p className="small">Grounded on semantically retrieved notes.</p>
+            </div>
+            <button type="button" className="ghost-button" onClick={closeLeftPanel}>
+              CLOSE
+            </button>
+          </div>
+          <div className="chat-thread">
+            {chatSession?.messages?.length ? (
+              chatSession.messages.map((message) => (
+                <article key={message.id} className={`chat-message role-${message.role}`}>
+                  <p>{message.content}</p>
+                  {message.citations?.length ? (
+                    <div className="chat-citations">
+                      {message.citations.map((citation) => (
+                        <button
+                          key={`${message.id}-${citation.chunkId}`}
+                          type="button"
+                          className="chip"
+                          onClick={() => void openExistingNote(citation.noteId)}
+                        >
+                          {citation.noteTitle}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
+              ))
+            ) : (
+              <p className="small">Start a conversation. Answers will cite the supporting notes.</p>
+            )}
+          </div>
+          <form className="workspace-form chat-form" onSubmit={submitChat}>
+            <label className="workspace-grow">
+              Message
+              <textarea
+                value={chatInput}
+                onChange={(event) => setChatInput(event.target.value)}
+                placeholder="Ask about your imported or written notes."
+              />
+            </label>
+            <div className="sheet-actions">
+              <button type="submit" className="ghost-button" disabled={chatLoading}>
+                {chatLoading ? "Thinking..." : "Send"}
+              </button>
+            </div>
           </form>
         </aside>
       )}
