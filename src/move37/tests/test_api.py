@@ -226,6 +226,114 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(api_response.status_code, 503)
         self.assertEqual(api_response.json()["detail"], "AI service unavailable.")
 
+    def test_replace_dependencies_rejects_cycle(self) -> None:
+        # Create two activities with A -> B dependency
+        create_a = self.client.post(
+            "/v1/activities",
+            headers={"Authorization": "Bearer test-token"},
+            json={"title": "Activity A"},
+        )
+        self.assertEqual(create_a.status_code, 200)
+        activity_a_id = [n for n in create_a.json()["nodes"] if n["title"] == "Activity A"][0]["id"]
+
+        create_b = self.client.post(
+            "/v1/activities",
+            headers={"Authorization": "Bearer test-token"},
+            json={"title": "Activity B", "parentIds": [activity_a_id]},
+        )
+        self.assertEqual(create_b.status_code, 200)
+        activity_b_id = [n for n in create_b.json()["nodes"] if n["title"] == "Activity B"][0]["id"]
+
+        # Try to replace A's dependencies to depend on B, creating a cycle
+        response = self.client.put(
+            f"/v1/activities/{activity_a_id}/dependencies",
+            headers={"Authorization": "Bearer test-token"},
+            json={"parentIds": [activity_b_id]},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["detail"], "That dependency would create a cycle.")
+
+    def test_delete_dependency_returns_not_found_for_missing_edge(self) -> None:
+        # Create two activities without any dependency between them
+        create_a = self.client.post(
+            "/v1/activities",
+            headers={"Authorization": "Bearer test-token"},
+            json={"title": "Activity X"},
+        )
+        self.assertEqual(create_a.status_code, 200)
+        activity_x_id = [n for n in create_a.json()["nodes"] if n["title"] == "Activity X"][0]["id"]
+
+        create_b = self.client.post(
+            "/v1/activities",
+            headers={"Authorization": "Bearer test-token"},
+            json={"title": "Activity Y"},
+        )
+        self.assertEqual(create_b.status_code, 200)
+        activity_y_id = [n for n in create_b.json()["nodes"] if n["title"] == "Activity Y"][0]["id"]
+
+        # Try to delete a non-existent dependency edge
+        response = self.client.delete(
+            f"/v1/dependencies/{activity_x_id}/{activity_y_id}",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Dependency edge not found.")
+
+    def test_replace_schedule_rejects_manual_edit(self) -> None:
+        # Create an activity
+        create_response = self.client.post(
+            "/v1/activities",
+            headers={"Authorization": "Bearer test-token"},
+            json={"title": "Scheduled Activity"},
+        )
+        self.assertEqual(create_response.status_code, 200)
+        activity_id = [n for n in create_response.json()["nodes"] if n["title"] == "Scheduled Activity"][0]["id"]
+
+        # Try to replace the activity's schedule (always rejected)
+        response = self.client.put(
+            f"/v1/activities/{activity_id}/schedule",
+            headers={"Authorization": "Bearer test-token"},
+            json={"peers": []},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"],
+            "Manual schedule rules are derived from startDate and cannot be edited directly.",
+        )
+
+    def test_delete_schedule_rejects_manual_deletion(self) -> None:
+        # Create two activities (schedule edge existence doesn't matter)
+        create_a = self.client.post(
+            "/v1/activities",
+            headers={"Authorization": "Bearer test-token"},
+            json={"title": "Earlier Task"},
+        )
+        self.assertEqual(create_a.status_code, 200)
+        earlier_id = [n for n in create_a.json()["nodes"] if n["title"] == "Earlier Task"][0]["id"]
+
+        create_b = self.client.post(
+            "/v1/activities",
+            headers={"Authorization": "Bearer test-token"},
+            json={"title": "Later Task"},
+        )
+        self.assertEqual(create_b.status_code, 200)
+        later_id = [n for n in create_b.json()["nodes"] if n["title"] == "Later Task"][0]["id"]
+
+        # Try to delete a schedule edge (always rejected)
+        response = self.client.delete(
+            f"/v1/schedules/{earlier_id}/{later_id}",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.json()["detail"],
+            "Manual schedule rules are derived from startDate and cannot be deleted directly.",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
