@@ -44,9 +44,6 @@ jobs:
           fi
 
           TAGS="ghcr.io/${{ github.repository_owner }}/move37-api:${IMAGE_TAG}"
-          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            TAGS="${TAGS}"$'\n'"ghcr.io/${{ github.repository_owner }}/move37-api:latest"
-          fi
 
           {
             echo "tags<<EOF"

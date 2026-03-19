@@ -16,6 +16,9 @@ class FakeClient:
         private_key = public.PrivateKey.generate()
         self.public_key = base64.b64encode(bytes(private_key.public_key)).decode("utf-8")
 
+    def create_branch(self, owner: str, repo: str, name: str, sha: str) -> None:
+        self.calls.append(("create_branch", name, sha))
+
     def update_repository(self, owner: str, repo: str, payload: dict[str, object]) -> None:
         self.calls.append(("update_repository", payload))
 
@@ -82,7 +85,8 @@ class ApplyPlanTest(unittest.TestCase):
             owner="Genentech",
             repo="move37",
             changes=[
-                PlanChange("repository", "update", "Genentech/move37", {"default_branch": "main"}),
+                PlanChange("branch", "create", "stable", {"name": "stable", "sha": "abc123"}),
+                PlanChange("repository", "update", "Genentech/move37", {"default_branch": "stable"}),
                 PlanChange("label", "create", "bug", {"name": "bug", "color": "d73a4a"}),
                 PlanChange(
                     "variable",
@@ -102,13 +106,13 @@ class ApplyPlanTest(unittest.TestCase):
         result = apply_plan(plan, FakeClient())
 
         self.assertTrue(result.ok)
-        self.assertEqual(len(result.applied), 4)
+        self.assertEqual(len(result.applied), 5)
 
     def test_apply_plan_reports_partial_failures(self) -> None:
         plan = PlanResult(
             owner="Genentech",
             repo="move37",
-            changes=[PlanChange("repository", "update", "Genentech/move37", {"default_branch": "main"})],
+            changes=[PlanChange("repository", "update", "Genentech/move37", {"default_branch": "stable"})],
         )
 
         result = apply_plan(plan, FailingClient())

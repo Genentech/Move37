@@ -60,19 +60,19 @@ export class Move37EksStack extends cdk.Stack {
 
     const apiImage = new cdk.CfnParameter(this, "ApiImage", {
       type: "String",
-      default: "ghcr.io/owner/move37-api:latest",
+      default: "ghcr.io/owner/move37-api:0.0.0",
       description: "Container image for the API service.",
     });
 
     const webImage = new cdk.CfnParameter(this, "WebImage", {
       type: "String",
-      default: "ghcr.io/owner/move37-web:latest",
+      default: "ghcr.io/owner/move37-web:0.0.0",
       description: "Container image for the web service.",
     });
 
     const dbImage = new cdk.CfnParameter(this, "DbImage", {
       type: "String",
-      default: "ghcr.io/owner/move37-db:latest",
+      default: "ghcr.io/owner/move37-db:0.0.0",
       description: "Container image for the database service.",
     });
 

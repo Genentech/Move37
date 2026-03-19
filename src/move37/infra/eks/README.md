@@ -35,7 +35,7 @@ Container release tags:
 - `v1.2.3-b.1` -> dev image tags
 - `v1.2.3-a.1` -> beta image tags
 - `v1.2.3-rc.1` -> rc image tags
-- `v1.2.3` -> prod image tags and `latest`
+- `v1.2.3` -> prod image tags
 
 Infra release tags:
 

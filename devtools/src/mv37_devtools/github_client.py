@@ -73,6 +73,21 @@ class GitHubClient:
             json=payload,
         )
 
+    def list_branches(self, owner: str, repo: str) -> list[dict[str, Any]]:
+        return self._request(
+            "GET",
+            f"/repos/{owner}/{repo}/branches",
+            params={"per_page": 100},
+        )
+
+    def create_branch(self, owner: str, repo: str, name: str, sha: str) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/repos/{owner}/{repo}/git/refs",
+            expected_statuses=(201,),
+            json={"ref": f"refs/heads/{name}", "sha": sha},
+        )
+
     def list_labels(self, owner: str, repo: str) -> list[dict[str, Any]]:
         return self._request(
             "GET",

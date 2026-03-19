@@ -17,8 +17,9 @@ def sample_config() -> RepoConfig:
             "repo": {
                 "owner": "Genentech",
                 "name": "move37",
-                "default_branch": "main",
+                "default_branch": "stable",
             },
+            "branches": [],
             "rulesets": {},
             "labels": [],
             "variables": {"from_env_files": [], "required": {}},

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
-from .config_schema import RepoConfig, ResolvedEnvBindings, RulesetConfig
+from .config_schema import BranchConfig, RepoConfig, ResolvedEnvBindings, RulesetConfig
 
 
 REPO_SETTING_FIELDS = (
@@ -25,6 +25,7 @@ class LiveRepoState:
     """Normalized live GitHub repo state."""
 
     repository: dict[str, Any]
+    branches: dict[str, str]
     labels: dict[str, dict[str, Any]]
     rulesets: dict[str, dict[str, Any]]
     variables: dict[str, str]
@@ -62,7 +63,12 @@ def fetch_live_state(config: RepoConfig, client: Any) -> LiveRepoState:
 
     owner = config.repo.owner
     repo = config.repo.name
-    repository = _normalize_repository(client.get_repository(owner, repo))
+    raw_repository = client.get_repository(owner, repo)
+    repository = _normalize_repository(raw_repository)
+    branches = {
+        branch["name"]: branch.get("commit", {}).get("sha", "")
+        for branch in client.list_branches(owner, repo)
+    }
     labels = {
         label["name"].lower(): _normalize_label(label)
         for label in client.list_labels(owner, repo)
@@ -78,6 +84,7 @@ def fetch_live_state(config: RepoConfig, client: Any) -> LiveRepoState:
     secrets = {secret["name"] for secret in client.list_actions_secrets(owner, repo)}
     return LiveRepoState(
         repository=repository,
+        branches=branches,
         labels=labels,
         rulesets=rulesets,
         variables=variables,
@@ -103,6 +110,27 @@ def build_plan(
         result.errors.extend(
             f"missing required env key: {name}" for name in env_bindings.missing_keys
         )
+
+    planned_branch_heads = dict(live_state.branches)
+    for branch in config.branches:
+        if branch.name in planned_branch_heads:
+            continue
+        source_sha = _resolve_branch_source_sha(branch, config, live_state, planned_branch_heads)
+        if source_sha is None:
+            result.errors.append(
+                f"cannot determine source ref for branch: {branch.name}"
+            )
+            continue
+        result.changes.append(
+            PlanChange(
+                surface="branch",
+                action="create",
+                target=branch.name,
+                payload={"name": branch.name, "sha": source_sha},
+                details={"source": branch.source or live_state.repository.get("default_branch")},
+            )
+        )
+        planned_branch_heads[branch.name] = source_sha
 
     repo_payload = _build_repo_payload(config)
     repo_diff = {
@@ -271,6 +299,26 @@ def _build_repo_payload(config: RepoConfig) -> dict[str, Any]:
 
 def _normalize_repository(repository: dict[str, Any]) -> dict[str, Any]:
     return {field: repository.get(field) for field in REPO_SETTING_FIELDS}
+
+
+def _resolve_branch_source_sha(
+    branch: BranchConfig,
+    config: RepoConfig,
+    live_state: LiveRepoState,
+    planned_branch_heads: dict[str, str],
+) -> Optional[str]:
+    candidates: list[str] = []
+    if branch.source:
+        candidates.append(branch.source)
+    live_default_branch = live_state.repository.get("default_branch")
+    if live_default_branch:
+        candidates.append(live_default_branch)
+    candidates.append(config.repo.default_branch)
+
+    for candidate in candidates:
+        if candidate and candidate in planned_branch_heads and planned_branch_heads[candidate]:
+            return planned_branch_heads[candidate]
+    return None
 
 
 def _normalize_label(label: dict[str, Any]) -> dict[str, Any]:

@@ -31,7 +31,7 @@ name = "move37"
 [repo]
 owner = "Genentech"
 name = "move37"
-default_branch = "main"
+default_branch = "stable"
 
 [[labels]]
 name = "bug"
@@ -71,7 +71,7 @@ BAZ=qux # inline comment
 [repo]
 owner = "Genentech"
 name = "move37"
-default_branch = "main"
+default_branch = "stable"
 
 [variables]
 from_env_files = [".env"]

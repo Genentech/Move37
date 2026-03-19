@@ -2,7 +2,7 @@ name: Deploy Contributor Docs
 
 on:
   push:
-    branches: [ main ]
+    branches: [ stable ]
     paths:
       - "contributing-docs/**"
       - ".github/workflows/deploy-contributor-docs.yml"

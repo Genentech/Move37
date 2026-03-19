@@ -63,7 +63,7 @@ const config = {
             },
             {
               label: "Fern Workspace",
-              href: "https://github.com/Genentech/Move37/tree/main/fern",
+              href: "https://github.com/Genentech/Move37/tree/stable/fern",
             },
           ],
         },

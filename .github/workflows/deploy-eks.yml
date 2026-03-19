@@ -120,7 +120,7 @@ jobs:
                 CLUSTER_NAME="move37-eks-rc"
                 NAMESPACE="move37-rc"
                 ;;
-              latest)
+              stable)
                 DEPLOY_ENV="prod"
                 CLUSTER_NAME="move37-eks-prod"
                 NAMESPACE="move37-prod"

@@ -34,7 +34,7 @@ export class Move37GithubOidcBootstrapStack extends cdk.Stack {
       "refs/heads/dev",
       "refs/heads/beta",
       "refs/heads/rc",
-      "refs/heads/latest",
+      "refs/heads/stable",
     ];
 
     const deployRoleName = new cdk.CfnParameter(this, "DeployRoleName", {

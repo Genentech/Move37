@@ -34,7 +34,14 @@ def apply_plan(plan: PlanResult, client: Any) -> ApplyResult:
     repo = plan.repo
     for change in plan.changes:
         try:
-            if change.surface == "repository":
+            if change.surface == "branch":
+                client.create_branch(
+                    owner,
+                    repo,
+                    change.payload["name"],
+                    change.payload["sha"],
+                )
+            elif change.surface == "repository":
                 client.update_repository(owner, repo, change.payload)
             elif change.surface == "ruleset":
                 payload = dict(change.payload)

@@ -73,6 +73,25 @@ class RulesetConfig(BaseModel):
         return sorted(dict.fromkeys(cleaned))
 
 
+class BranchConfig(BaseModel):
+    """Managed Git branch configuration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    source: Optional[str] = None
+
+    @field_validator("name", "source")
+    @classmethod
+    def validate_branch_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        branch_name = value.strip()
+        if not branch_name:
+            raise ValueError("branch name cannot be empty")
+        return branch_name
+
+
 class LabelConfig(BaseModel):
     """GitHub label configuration."""
 
@@ -122,9 +141,24 @@ class RepoConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     repo: RepoSettingsConfig
+    branches: list[BranchConfig] = Field(default_factory=list)
     rulesets: dict[str, RulesetConfig] = Field(default_factory=dict)
     labels: list[LabelConfig] = Field(default_factory=list)
     variables: VariableBindingsConfig = Field(default_factory=VariableBindingsConfig)
+
+    @field_validator("branches")
+    @classmethod
+    def validate_unique_branches(cls, branches: list[BranchConfig]) -> list[BranchConfig]:
+        seen: set[str] = set()
+        duplicates: list[str] = []
+        for branch in branches:
+            key = branch.name.lower()
+            if key in seen:
+                duplicates.append(branch.name)
+            seen.add(key)
+        if duplicates:
+            raise ValueError(f"duplicate branch definitions: {', '.join(duplicates)}")
+        return branches
 
 
 @dataclass(slots=True)

@@ -1,20 +1,69 @@
 [repo]
 owner = "Genentech"
 name = "move37"
-default_branch = "main"
+default_branch = "stable"
 description = "move37 is a human operating system for the AI age."
 homepage = ""
 allow_squash_merge = true
-allow_merge_commit = false
+allow_merge_commit = true
 allow_rebase_merge = false
 delete_branch_on_merge = true
 allow_auto_merge = true
 
-[rulesets.default_branch]
-name = "default-branch"
+[[branches]]
+name = "stable"
+
+[[branches]]
+name = "dev"
+source = "stable"
+
+[[branches]]
+name = "beta"
+source = "stable"
+
+[[branches]]
+name = "rc"
+source = "stable"
+
+[rulesets.stable]
+name = "stable"
 enforcement = "active"
 target = "branch"
-patterns = ["main"]
+patterns = ["stable"]
+require_pull_request = true
+required_approvals = 2
+dismiss_stale_reviews = true
+require_code_owner_review = false
+require_last_push_approval = false
+require_resolved_conversations = true
+require_linear_history = true
+require_signed_commits = false
+block_force_pushes = true
+block_deletions = true
+required_status_checks = ["python", "sdk", "web", "contributor-docs"]
+
+[rulesets.rc]
+name = "rc"
+enforcement = "active"
+target = "branch"
+patterns = ["rc"]
+require_pull_request = true
+required_approvals = 2
+dismiss_stale_reviews = true
+require_code_owner_review = false
+require_last_push_approval = false
+require_resolved_conversations = true
+require_linear_history = true
+require_signed_commits = false
+block_force_pushes = true
+block_deletions = true
+required_status_checks = ["python", "sdk", "web", "contributor-docs"]
+
+[rulesets.beta]
+name = "beta"
+enforcement = "active"
+target = "branch"
+patterns = ["beta"]
 require_pull_request = true
 required_approvals = 1
 dismiss_stale_reviews = true
@@ -25,7 +74,24 @@ require_linear_history = true
 require_signed_commits = false
 block_force_pushes = true
 block_deletions = true
-required_status_checks = ["python", "sdk", "web"]
+required_status_checks = ["python", "sdk", "web", "contributor-docs"]
+
+[rulesets.dev]
+name = "dev"
+enforcement = "active"
+target = "branch"
+patterns = ["dev"]
+require_pull_request = true
+required_approvals = 1
+dismiss_stale_reviews = true
+require_code_owner_review = false
+require_last_push_approval = false
+require_resolved_conversations = true
+require_linear_history = true
+require_signed_commits = false
+block_force_pushes = true
+block_deletions = true
+required_status_checks = ["python", "sdk", "web", "contributor-docs"]
 
 [[labels]]
 name = "bug"

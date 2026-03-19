@@ -12,20 +12,27 @@ def sample_config() -> RepoConfig:
             "repo": {
                 "owner": "Genentech",
                 "name": "move37",
-                "default_branch": "main",
+                "default_branch": "stable",
                 "description": "Move37",
                 "homepage": "",
                 "allow_squash_merge": True,
-                "allow_merge_commit": False,
+                "allow_merge_commit": True,
                 "allow_rebase_merge": False,
                 "delete_branch_on_merge": True,
                 "allow_auto_merge": True,
             },
+            "branches": [
+                {"name": "stable"},
+                {"name": "dev", "source": "stable"},
+                {"name": "beta", "source": "stable"},
+                {"name": "rc", "source": "stable"},
+            ],
             "rulesets": {
-                "default_branch": {
-                    "name": "default-branch",
-                    "patterns": ["main"],
-                    "required_status_checks": ["python", "sdk", "web"],
+                "stable": {
+                    "name": "stable",
+                    "patterns": ["stable"],
+                    "required_approvals": 2,
+                    "required_status_checks": ["contributor-docs", "python", "sdk", "web"],
                 }
             },
             "labels": [
@@ -47,25 +54,31 @@ def matching_live_state() -> LiveRepoState:
         repository={
             "description": "Move37",
             "homepage": "",
-            "default_branch": "main",
+            "default_branch": "stable",
             "allow_squash_merge": True,
-            "allow_merge_commit": False,
+            "allow_merge_commit": True,
             "allow_rebase_merge": False,
             "delete_branch_on_merge": True,
             "allow_auto_merge": True,
+        },
+        branches={
+            "stable": "abc123",
+            "dev": "abc123",
+            "beta": "abc123",
+            "rc": "abc123",
         },
         labels={
             "bug": {"name": "bug", "color": "d73a4a", "description": "broken"},
         },
         rulesets={
-            "default-branch": {
+            "stable": {
                 "id": 1,
-                "name": "default-branch",
+                "name": "stable",
                 "target": "branch",
                 "enforcement": "active",
-                "patterns": ["main"],
+                "patterns": ["stable"],
                 "require_pull_request": True,
-                "required_approvals": 1,
+                "required_approvals": 2,
                 "dismiss_stale_reviews": True,
                 "require_code_owner_review": False,
                 "require_last_push_approval": False,
@@ -74,7 +87,7 @@ def matching_live_state() -> LiveRepoState:
                 "require_signed_commits": False,
                 "block_force_pushes": True,
                 "block_deletions": True,
-                "required_status_checks": ["python", "sdk", "web"],
+                "required_status_checks": ["contributor-docs", "python", "sdk", "web"],
             }
         },
         variables={"MOVE37_POSTGRES_DB": "move37"},
@@ -103,7 +116,7 @@ class PlannerTest(unittest.TestCase):
 
     def test_build_plan_detects_repo_settings_drift(self) -> None:
         live_state = matching_live_state()
-        live_state.repository["allow_merge_commit"] = True
+        live_state.repository["allow_merge_commit"] = False
 
         plan = build_plan(sample_config(), live_state, resolved_env())
 
@@ -120,11 +133,31 @@ class PlannerTest(unittest.TestCase):
 
     def test_build_plan_detects_ruleset_drift(self) -> None:
         live_state = matching_live_state()
-        live_state.rulesets["default-branch"]["required_approvals"] = 2
+        live_state.rulesets["stable"]["required_approvals"] = 1
 
         plan = build_plan(sample_config(), live_state, resolved_env())
 
         self.assertTrue(any(change.surface == "ruleset" for change in plan.changes))
+
+    def test_build_plan_detects_missing_branch(self) -> None:
+        live_state = matching_live_state()
+        live_state.branches = {"stable": "abc123"}
+
+        plan = build_plan(sample_config(), live_state, resolved_env())
+
+        self.assertTrue(any(change.surface == "branch" for change in plan.changes))
+
+    def test_build_plan_creates_stable_from_live_default_branch(self) -> None:
+        live_state = matching_live_state()
+        live_state.repository["default_branch"] = "main"
+        live_state.branches = {"main": "def456"}
+
+        plan = build_plan(sample_config(), live_state, resolved_env())
+
+        branch_changes = [change for change in plan.changes if change.surface == "branch"]
+        self.assertTrue(branch_changes)
+        self.assertEqual(branch_changes[0].target, "stable")
+        self.assertEqual(branch_changes[0].payload["sha"], "def456")
 
     def test_build_plan_reports_missing_env_keys(self) -> None:
         plan = build_plan(

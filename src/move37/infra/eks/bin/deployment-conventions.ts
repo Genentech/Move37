@@ -113,7 +113,7 @@ function resolveEnvironmentFromBranch(branch: string): DeploymentEnvironment {
   if (branch === "rc") {
     return "rc";
   }
-  if (branch === "latest" || branch === "main" || branch === "stable") {
+  if (branch === "stable") {
     return "prod";
   }
   return "dev";

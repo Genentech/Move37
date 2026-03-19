@@ -13,18 +13,20 @@ Move37 uses two different categories of GitHub Actions workflows:
 
 Do not assume a release workflow is safe to run casually from a feature branch. Most of them are designed around tags and repository secrets.
 
+For the recommended long-lived branch promotion model, see [GitOps Strategy](./gitops-strategy).
+
 ## Contributor-facing workflows
 
 `.github/workflows/lint.yml` runs on:
 
-- pushes to `main`
+- pushes to `dev`, `beta`, `rc`, and `stable`
 - pull requests
 
 It is the workflow most contributors should care about first.
 
 `.github/workflows/deploy-contributor-docs.yml` runs on:
 
-- pushes to `main` that touch `contributing-docs/**`
+- pushes to `stable` that touch `contributing-docs/**`
 - manual dispatch
 
 It builds and deploys the contributor docs to GitHub Pages.

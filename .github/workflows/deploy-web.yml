@@ -38,16 +38,13 @@ jobs:
           elif [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\..+$ ]]; then
             TARGET_BRANCH="rc"
           elif [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            TARGET_BRANCH="latest"
+            TARGET_BRANCH="stable"
           else
             echo "Unsupported tag format: $TAG" >&2
             exit 1
           fi
 
           TAGS="ghcr.io/${{ github.repository_owner }}/move37-web:${IMAGE_TAG}"
-          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            TAGS="${TAGS}"$'\n'"ghcr.io/${{ github.repository_owner }}/move37-web:latest"
-          fi
 
           echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
           echo "target_branch=$TARGET_BRANCH" >> "$GITHUB_OUTPUT"
