@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useActivityGraph, useAppleCalendar, useChatSession, useNotes } from "@move37/sdk/react";
+import { useActivityGraph, useNotes } from "@move37/sdk/react";
 import "./App.css";
 import {
   buildIndexes,
@@ -13,7 +13,7 @@ import {
   rotateY,
   wouldCreateCycle,
 } from "./graph";
-import { CalendarSurface, getCalendarWindow, shiftCalendarAnchor, TaskListSurface } from "./surfaces";
+import { TaskListSurface } from "./surfaces";
 
 const TOPBAR_MESSAGES = [
   "human operating system for the AI age",
@@ -494,16 +494,6 @@ function NotesIcon() {
       <path d="M8.4 10.2h7.2" className="icon-map-line" />
       <path d="M8.4 13.4h7.2" className="icon-map-line" />
       <path d="M8.4 16.6h4.8" className="icon-map-line" />
-    </svg>
-  );
-}
-
-function ChatIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M5 6.4h14v9.8H9.4L5 19.6z" className="icon-map-outline" />
-      <path d="M8 10.3h8" className="icon-map-line" />
-      <path d="M8 13.4h5.6" className="icon-map-line" />
     </svg>
   );
 }
@@ -1022,19 +1012,6 @@ export default function App() {
   );
   const [surfaceMode, setSurfaceMode] = useState("graph");
   const [viewMode, setViewMode] = useState("3d");
-  const [calendarRange, setCalendarRange] = useState("week");
-  const [calendarAnchorDate, setCalendarAnchorDate] = useState(() => new Date());
-  const calendarWindow = useMemo(
-    () => getCalendarWindow(calendarRange, calendarAnchorDate),
-    [calendarAnchorDate, calendarRange],
-  );
-  const calendarQueryRange =
-    surfaceMode === "calendar"
-      ? {
-          start: calendarWindow.start.toISOString(),
-          end: calendarWindow.end.toISOString(),
-        }
-      : null;
   const {
     graph: canonicalGraph,
     error: apiError,
@@ -1057,20 +1034,6 @@ export default function App() {
     importTxtNotes,
     updateNote,
   } = useNotes(apiOptions);
-  const {
-    session: chatSession,
-    createSession,
-    reload: reloadChatSession,
-    sendMessage,
-    loading: chatLoading,
-  } = useChatSession(apiOptions);
-  const {
-    status: appleCalendarStatus,
-    events: appleCalendarEvents,
-    loading: calendarLoading,
-    reconciling: calendarReconciling,
-    reconcile: reconcileAppleCalendar,
-  } = useAppleCalendar({ ...apiOptions, range: calendarQueryRange });
   const [graph, setGraph] = useState(() => sanitizeGraph(EMPTY_GRAPH));
   const [transition, setTransition] = useState(null);
   const [modeMorph, setModeMorph] = useState(null);
@@ -1103,7 +1066,6 @@ export default function App() {
   const [importPopoverMode, setImportPopoverMode] = useState(null);
   const [urlImportValue, setUrlImportValue] = useState("");
   const [urlImportLoading, setUrlImportLoading] = useState(false);
-  const [chatInput, setChatInput] = useState("");
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [ambientFlow, setAmbientFlow] = useState({
@@ -1252,7 +1214,7 @@ export default function App() {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [isMorphing, isPointerDown, viewMode, workingId]);
+  }, [graphSuspended, isMorphing, isPointerDown, viewMode, workingId]);
 
   useEffect(
     () => () => {
@@ -2099,16 +2061,7 @@ export default function App() {
     pendingSurfaceActionRef.current = null;
     setSurfaceClosingMode(null);
     setSurfaceMode("list");
-    setContextMenu(null);
-    setIsModeMenuExpanded(false);
-  }
-
-  function openCalendarSurface(nextRange = calendarRange) {
-    clearSurfaceCloseTimer();
-    pendingSurfaceActionRef.current = null;
-    setSurfaceClosingMode(null);
-    setSurfaceMode("calendar");
-    setCalendarRange(nextRange);
+    setSelectedId(null);
     setContextMenu(null);
     setIsModeMenuExpanded(false);
   }
@@ -2233,15 +2186,6 @@ export default function App() {
     animateViewport({ panOffset: defaultViewport.panOffset });
   }
 
-  function focusPanel() {
-    animateViewport({
-      panOffset: {
-        x: defaultViewport.panOffset.x + Math.round(size.width * 0.17),
-        y: defaultViewport.panOffset.y,
-      },
-    });
-  }
-
   function removeDraftNoteNode() {
     if (!draftNoteNodeId) {
       return;
@@ -2319,7 +2263,6 @@ export default function App() {
     setLeftPanel(null);
     setActiveNote(null);
     setNoteDraft("");
-    setChatInput("");
     recenterView();
   }
 
@@ -2418,26 +2361,6 @@ export default function App() {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
     } finally {
       setUrlImportLoading(false);
-    }
-  }
-
-  async function submitChat(event) {
-    event.preventDefault();
-    const content = chatInput.trim();
-    if (!content) {
-      return;
-    }
-    try {
-      let sessionId = chatSession?.id;
-      if (!sessionId) {
-        const created = await createSession({ title: "Notes chat" });
-        sessionId = created.id;
-      }
-      await sendMessage(sessionId, { content });
-      await reloadChatSession(sessionId);
-      setChatInput("");
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : String(nextError));
     }
   }
 
@@ -2840,196 +2763,198 @@ export default function App() {
         <div className="brand">
           <p className="eyebrow">MOVE37</p>
         </div>
-      </header>
-
-      <aside
-        ref={dockRef}
-        className={`control-dock ${isImportMenuExpanded ? "expanded" : ""}`}
-        aria-label="View controls"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className={`uri-search ${isSearchExpanded ? "expanded" : "collapsed"}`}>
-          <button
-            type="button"
-            className="dock-button search-trigger"
-            onClick={handleSearchTrigger}
-            aria-label="Search activity"
-            title="Search activity"
+        <div className="topbar-actions" onClick={(event) => event.stopPropagation()}>
+          {leftPanel === "note-editor" ? (
+            <>
+              <button
+                type="submit"
+                form="notes-editor-form"
+                className="topbar-icon-button topbar-control-button"
+                aria-label="Save note"
+                title="Save note"
+              >
+                <SaveIcon />
+              </button>
+              <button
+                type="button"
+                className="topbar-icon-button topbar-control-button"
+                onClick={closeLeftPanel}
+                aria-label="Exit note editor"
+                title="Exit note editor"
+              >
+                <ExitIcon />
+              </button>
+            </>
+          ) : null}
+          {!displayedSurfaceMode && selected && selectedDetails && selected.kind !== "note" ? (
+            <button
+              type="button"
+              className="topbar-icon-button topbar-control-button"
+              onClick={() => setSelectedId(null)}
+              aria-label="Close activity details"
+              title="Close activity details"
+            >
+              <ExitIcon />
+            </button>
+          ) : null}
+          <div
+            ref={dockRef}
+            className={`control-dock topbar-control-dock ${isImportMenuExpanded ? "expanded" : ""}`}
+            aria-label="View controls"
           >
-            <SearchIcon />
-          </button>
-          <div className="uri-search-panel">
-            {isSearchExpanded ? (
-              <input
-                ref={searchInputRef}
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void runSearch();
-                  }
-                }}
-                placeholder={SEARCH_PLACEHOLDER}
+            <div className={`uri-search ${isSearchExpanded ? "expanded" : "collapsed"}`}>
+              <button
+                type="button"
+                className="dock-button search-trigger"
+                onClick={handleSearchTrigger}
                 aria-label="Search activity"
+                title="Search activity"
+              >
+                <SearchIcon />
+              </button>
+              <div className="uri-search-panel">
+                {isSearchExpanded ? (
+                  <input
+                    ref={searchInputRef}
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void runSearch();
+                      }
+                    }}
+                    placeholder={SEARCH_PLACEHOLDER}
+                    aria-label="Search activity"
+                  />
+                ) : null}
+              </div>
+            </div>
+            <div className={`dock-mode ${isModeMenuExpanded ? "expanded" : ""}`}>
+              <button
+                type="button"
+                className={`dock-button ${isModeMenuExpanded || displayedSurfaceMode ? "active" : ""}`}
+                onClick={() => {
+                  setIsImportMenuExpanded(false);
+                  setIsModeMenuExpanded((value) => !value);
+                }}
+                aria-label="Choose view mode"
+                title="Choose view mode"
+              >
+                {surfaceMode === "list" ? <ListIcon /> : viewMode === "2d" ? <RingsIcon /> : <GlobeIcon />}
+              </button>
+              <div className="dock-mode-actions" aria-hidden={!isModeMenuExpanded}>
+                <button
+                  type="button"
+                  className={`dock-subaction ${surfaceMode === "graph" && viewMode === "2d" ? "active" : ""}`}
+                  onClick={() => switchViewMode("2d")}
+                  title="2D view"
+                >
+                  <RingsIcon />
+                  <span>2D</span>
+                </button>
+                <button
+                  type="button"
+                  className={`dock-subaction ${surfaceMode === "graph" && viewMode === "3d" ? "active" : ""}`}
+                  onClick={() => switchViewMode("3d")}
+                  title="3D view"
+                >
+                  <GlobeIcon />
+                  <span>3D</span>
+                </button>
+                <button
+                  type="button"
+                  className={`dock-subaction ${surfaceMode === "list" ? "active" : ""}`}
+                  onClick={openListSurface}
+                  title="List view"
+                >
+                  <ListIcon />
+                  <span>List</span>
+                </button>
+              </div>
+            </div>
+            <button
+              type="button"
+              className={`dock-button ${leftPanel === "note-editor" ? "active" : ""}`}
+              onClick={() => {
+                if (leftPanel === "note-editor") {
+                  closeLeftPanel();
+                  return;
+                }
+                openDraftNoteWorkspace();
+              }}
+              aria-label="Open notes workspace"
+              title="Notes"
+            >
+              <NotesIcon />
+            </button>
+            <div className={`dock-import ${isImportMenuExpanded ? "expanded" : ""}`}>
+              <button
+                type="button"
+                className={`dock-button ${isImportMenuExpanded || importPopoverMode === "url" ? "active" : ""}`}
+                onClick={toggleImportMenu}
+                aria-label="Open note import controls"
+                title="Import notes"
+              >
+                <ImportIcon />
+              </button>
+              <div className="dock-import-actions" aria-hidden={!isImportMenuExpanded}>
+                <button
+                  type="button"
+                  className="dock-subaction"
+                  onClick={triggerBrowseImport}
+                  title="Browse .txt files"
+                >
+                  <ImportIcon />
+                  <span>Browse</span>
+                </button>
+                <button
+                  type="button"
+                  className="dock-subaction"
+                  onClick={openUrlImportPopover}
+                  title="Import from URL"
+                >
+                  <LinkIcon />
+                  <span>URL</span>
+                </button>
+              </div>
+              <input
+                ref={browseInputRef}
+                type="file"
+                accept=".txt,text/plain"
+                multiple
+                className="visually-hidden"
+                onChange={handleBrowseInputChange}
               />
+            </div>
+            {Math.abs(zoom - defaultViewport.zoom) > 0.001 ? (
+              <button
+                type="button"
+                className="dock-button dock-button-text"
+                onClick={() => {
+                  animateViewport({ zoom: defaultViewport.zoom });
+                }}
+                aria-label="Reset zoom to 100%"
+                title="100%"
+              >
+                100%
+              </button>
+            ) : null}
+            {Math.abs(panOffset.x - defaultViewport.panOffset.x) > 0.5 ||
+            Math.abs(panOffset.y - defaultViewport.panOffset.y) > 0.5 ? (
+              <button
+                type="button"
+                className="dock-button"
+                onClick={recenterView}
+                aria-label="Recenter sphere"
+                title="Recenter sphere"
+              >
+                <CenterIcon />
+              </button>
             ) : null}
           </div>
         </div>
-        <div className={`dock-mode ${isModeMenuExpanded ? "expanded" : ""}`}>
-          <button
-            type="button"
-            className={`dock-button ${isModeMenuExpanded || displayedSurfaceMode ? "active" : ""}`}
-            onClick={() => {
-              setIsImportMenuExpanded(false);
-              setIsModeMenuExpanded((value) => !value);
-            }}
-            aria-label="Choose view mode"
-            title="Choose view mode"
-          >
-            <CalendarIcon />
-          </button>
-          <div className="dock-mode-actions" aria-hidden={!isModeMenuExpanded}>
-            <button
-              type="button"
-              className={`dock-subaction ${surfaceMode === "graph" && viewMode === "2d" ? "active" : ""}`}
-              onClick={() => switchViewMode("2d")}
-              title="2D view"
-            >
-              <RingsIcon />
-              <span>2D</span>
-            </button>
-            <button
-              type="button"
-              className={`dock-subaction ${surfaceMode === "graph" && viewMode === "3d" ? "active" : ""}`}
-              onClick={() => switchViewMode("3d")}
-              title="3D view"
-            >
-              <GlobeIcon />
-              <span>3D</span>
-            </button>
-            <button
-              type="button"
-              className={`dock-subaction ${surfaceMode === "list" ? "active" : ""}`}
-              onClick={openListSurface}
-              title="List view"
-            >
-              <ListIcon />
-              <span>List</span>
-            </button>
-            <button
-              type="button"
-              className={`dock-subaction ${surfaceMode === "calendar" ? "active" : ""}`}
-              onClick={() => openCalendarSurface()}
-              title="Calendar view"
-            >
-              <CalendarIcon />
-              <span>Calendar</span>
-            </button>
-          </div>
-        </div>
-        <button
-          type="button"
-          className={`dock-button ${leftPanel === "note-editor" ? "active" : ""}`}
-          onClick={() => {
-            if (leftPanel === "note-editor") {
-              closeLeftPanel();
-              return;
-            }
-            if (leftPanel === "chat") {
-              closeLeftPanel();
-            }
-            openDraftNoteWorkspace();
-          }}
-          aria-label="Open notes workspace"
-          title="Notes"
-        >
-          <NotesIcon />
-        </button>
-        <div className={`dock-import ${isImportMenuExpanded ? "expanded" : ""}`}>
-          <button
-            type="button"
-            className={`dock-button ${isImportMenuExpanded || importPopoverMode === "url" ? "active" : ""}`}
-            onClick={toggleImportMenu}
-            aria-label="Open note import controls"
-            title="Import notes"
-          >
-            <ImportIcon />
-          </button>
-          <div className="dock-import-actions" aria-hidden={!isImportMenuExpanded}>
-            <button
-              type="button"
-              className="dock-subaction"
-              onClick={triggerBrowseImport}
-              title="Browse .txt files"
-            >
-              <ImportIcon />
-              <span>Browse</span>
-            </button>
-            <button
-              type="button"
-              className="dock-subaction"
-              onClick={openUrlImportPopover}
-              title="Import from URL"
-            >
-              <LinkIcon />
-              <span>URL</span>
-            </button>
-          </div>
-          <input
-            ref={browseInputRef}
-            type="file"
-            accept=".txt,text/plain"
-            multiple
-            className="visually-hidden"
-            onChange={handleBrowseInputChange}
-          />
-        </div>
-        <button
-          type="button"
-          className={`dock-button ${leftPanel === "chat" ? "active" : ""}`}
-          onClick={() => {
-            if (leftPanel === "chat") {
-              closeLeftPanel();
-              return;
-            }
-            setImportPopoverMode(null);
-            setIsImportMenuExpanded(false);
-            closeLeftPanel();
-            setLeftPanel("chat");
-            focusPanel();
-          }}
-          aria-label="Open notes chat"
-          title="Chat with notes"
-        >
-          <ChatIcon />
-        </button>
-        {Math.abs(zoom - defaultViewport.zoom) > 0.001 ? (
-          <button
-            type="button"
-            className="dock-button dock-button-text"
-            onClick={() => {
-              animateViewport({ zoom: defaultViewport.zoom });
-            }}
-            aria-label="Reset zoom to 100%"
-            title="100%"
-          >
-            100%
-          </button>
-        ) : null}
-        {Math.abs(panOffset.x - defaultViewport.panOffset.x) > 0.5 ||
-        Math.abs(panOffset.y - defaultViewport.panOffset.y) > 0.5 ? (
-          <button
-            type="button"
-            className="dock-button"
-            onClick={recenterView}
-            aria-label="Recenter sphere"
-            title="Recenter sphere"
-          >
-            <CenterIcon />
-          </button>
-        ) : null}
-      </aside>
+      </header>
 
       <p className={`status status-ticker ${messageVisible ? "visible" : "hidden"}`}>
         {TOPBAR_MESSAGES[messageIndex]}
@@ -3040,15 +2965,7 @@ export default function App() {
 
       {leftPanel === "note-editor" && (
         <aside className="notes-overlay" onClick={(event) => event.stopPropagation()}>
-          <form className="notes-overlay-form" onSubmit={submitNote}>
-            <div className="notes-overlay-toolbar">
-              <button type="submit" className="overlay-icon-button" aria-label="Save note" title="Save note">
-                <SaveIcon />
-              </button>
-              <button type="button" className="overlay-icon-button" onClick={closeLeftPanel} aria-label="Exit note editor" title="Exit note editor">
-                <ExitIcon />
-              </button>
-            </div>
+          <form id="notes-editor-form" className="notes-overlay-form" onSubmit={submitNote}>
             <textarea
               className="notes-editor"
               autoFocus
@@ -3056,60 +2973,6 @@ export default function App() {
               onChange={(event) => setNoteDraft(event.target.value)}
               placeholder={`Title on the first line\n\nWrite the rest of the note below.`}
             />
-          </form>
-        </aside>
-      )}
-
-      {leftPanel === "chat" && (
-        <aside className="workspace-panel chat-panel" onClick={(event) => event.stopPropagation()}>
-          <div className="workspace-header">
-            <div>
-              <h2>Notes Chat</h2>
-              <p className="small">Grounded on semantically retrieved notes.</p>
-            </div>
-            <button type="button" className="ghost-button" onClick={closeLeftPanel}>
-              CLOSE
-            </button>
-          </div>
-          <div className="chat-thread">
-            {chatSession?.messages?.length ? (
-              chatSession.messages.map((message) => (
-                <article key={message.id} className={`chat-message role-${message.role}`}>
-                  <p>{message.content}</p>
-                  {message.citations?.length ? (
-                    <div className="chat-citations">
-                      {message.citations.map((citation) => (
-                        <button
-                          key={`${message.id}-${citation.chunkId}`}
-                          type="button"
-                          className="chip"
-                          onClick={() => void openExistingNote(citation.noteId)}
-                        >
-                          {citation.noteTitle}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </article>
-              ))
-            ) : (
-              <p className="small">Start a conversation. Answers will cite the supporting notes.</p>
-            )}
-          </div>
-          <form className="workspace-form chat-form" onSubmit={submitChat}>
-            <label className="workspace-grow">
-              Message
-              <textarea
-                value={chatInput}
-                onChange={(event) => setChatInput(event.target.value)}
-                placeholder="Ask about your imported or written notes."
-              />
-            </label>
-            <div className="sheet-actions">
-              <button type="submit" className="ghost-button" disabled={chatLoading}>
-                {chatLoading ? "Thinking..." : "Send"}
-              </button>
-            </div>
           </form>
         </aside>
       )}
@@ -3202,74 +3065,29 @@ export default function App() {
               <stop offset="82%" stopColor="#01040c96" />
               <stop offset="100%" stopColor="#000209d6" />
             </radialGradient>
-            <marker
-              id="schedule-arrow"
-              viewBox="0 0 14 12"
-              refX="12.2"
-              refY="6"
-              markerWidth="7.2"
-              markerHeight="7.2"
-              orient="auto"
-              markerUnits="strokeWidth"
-            >
-              <path
-                d="M 1 1.4 C 4.4 2.2 7.2 3.8 12.2 6 C 7.2 8.2 4.4 9.8 1 10.6 C 2.8 9 4.1 7.6 5.2 6 C 4.1 4.4 2.8 3 1 1.4 z"
-                fill="#7ff4d7"
-              />
-            </marker>
-            <marker
-              id="schedule-arrow-active"
-              viewBox="0 0 14 12"
-              refX="12.2"
-              refY="6"
-              markerWidth="7.2"
-              markerHeight="7.2"
-              orient="auto"
-              markerUnits="strokeWidth"
-            >
-              <path
-                d="M 1 1.4 C 4.4 2.2 7.2 3.8 12.2 6 C 7.2 8.2 4.4 9.8 1 10.6 C 2.8 9 4.1 7.6 5.2 6 C 4.1 4.4 2.8 3 1 1.4 z"
-                fill="#abfff0"
-              />
-            </marker>
-            <marker
-              id="schedule-arrow-dimmed"
-              viewBox="0 0 14 12"
-              refX="12.2"
-              refY="6"
-              markerWidth="7.2"
-              markerHeight="7.2"
-              orient="auto"
-              markerUnits="strokeWidth"
-            >
-              <path
-                d="M 1 1.4 C 4.4 2.2 7.2 3.8 12.2 6 C 7.2 8.2 4.4 9.8 1 10.6 C 2.8 9 4.1 7.6 5.2 6 C 4.1 4.4 2.8 3 1 1.4 z"
-                fill="#7ff4d724"
-              />
-            </marker>
             {showDynamicGraph
               ? renderState.dependencyEdges.map((edge) => {
-              const from = displayProjected.byId[edge.parentId];
-              const to = displayProjected.byId[edge.childId];
-              if (!from || !to) {
-                return null;
-              }
-              const innerPalette = getLevelPalette(from.level ?? 0, renderMaxLevel, levelSeed);
-              const outerPalette = getLevelPalette(to.level ?? 0, renderMaxLevel, levelSeed);
-              return (
-                <linearGradient
-                  key={`gradient-${edge.id}`}
-                  id={`edge-gradient-${edge.id}`}
-                  gradientUnits="userSpaceOnUse"
-                  x1={to.x}
-                  y1={to.y}
-                  x2={from.x}
-                  y2={from.y}
-                >
-                  <stop offset="0%" stopColor={outerPalette.nodeFill} stopOpacity="0.88" />
-                  <stop offset="100%" stopColor={innerPalette.nodeFill} stopOpacity="0.68" />
-                </linearGradient>
-              );
+                  const from = displayProjected.byId[edge.parentId];
+                  const to = displayProjected.byId[edge.childId];
+                  if (!from || !to) {
+                    return null;
+                  }
+                  const innerPalette = getLevelPalette(from.level ?? 0, renderMaxLevel, levelSeed);
+                  const outerPalette = getLevelPalette(to.level ?? 0, renderMaxLevel, levelSeed);
+                  return (
+                    <linearGradient
+                      key={`gradient-${edge.id}`}
+                      id={`edge-gradient-${edge.id}`}
+                      gradientUnits="userSpaceOnUse"
+                      x1={to.x}
+                      y1={to.y}
+                      x2={from.x}
+                      y2={from.y}
+                    >
+                      <stop offset="0%" stopColor={outerPalette.nodeFill} stopOpacity="0.88" />
+                      <stop offset="100%" stopColor={innerPalette.nodeFill} stopOpacity="0.68" />
+                    </linearGradient>
+                  );
                 })
               : null}
           </defs>
@@ -3284,16 +3102,16 @@ export default function App() {
             fill="url(#sphere-halo)"
           />
           <ellipse
-            cx={displayProjected.centerX}
-            cy={displayProjected.centerY}
+            cx={sphereProjection.centerX}
+            cy={sphereProjection.centerY}
             rx={Math.min(size.width, size.height) * 0.44 * zoom}
             ry={Math.min(size.width, size.height) * 0.44 * zoom}
             className="sphere-glow-success"
             fill="url(#sphere-halo-success)"
           />
           <ellipse
-            cx={displayProjected.centerX}
-            cy={displayProjected.centerY}
+            cx={sphereProjection.centerX}
+            cy={sphereProjection.centerY}
             rx={Math.min(size.width, size.height) * 0.44 * zoom}
             ry={Math.min(size.width, size.height) * 0.44 * zoom}
             className="sphere-glow-failure"
@@ -3324,277 +3142,254 @@ export default function App() {
 
             {showDynamicGraph ? (
               <g className={`graph-layer ${nodesVisible ? "visible" : "hidden"}`}>
-            {renderState.dependencyEdges.map((edge) => {
-              const from = displayProjected.byId[edge.parentId];
-              const to = displayProjected.byId[edge.childId];
-              if (!from || !to) {
-                return null;
-              }
-              const ambientEdge = !selectedId && !isTransitioning && ambientFlow.dependencyEdgeIds.has(edge.id);
-              if (!selectedId && !isTransitioning && !ambientEdge) {
-                return null;
-              }
-              const edgeStyle = getLevelVisualStyle(
-                Math.max(from.level ?? 0, to.level ?? 0),
-                renderMaxLevel,
-                levelSeed,
-              );
-              const active =
-                selectedId &&
-                highlightedDependencyIds.has(edge.parentId) &&
-                highlightedDependencyIds.has(edge.childId);
-              const dimmed = selectedId && !active;
-              const fromRadius = getNodeRenderRadius(from);
-              const toRadius = getNodeRenderRadius(to);
-              const fromWidth = Math.max(1.5, fromRadius * (active ? 0.52 : 0.44));
-              const toWidth = Math.max(1.8, toRadius * (active ? 0.56 : 0.48));
-              const midWidth = Math.max(0.72, Math.min(fromWidth, toWidth) * (active ? 0.26 : 0.18));
-              return (
-                <g key={edge.id}>
-                  <line
-                    className="edge-hit-area"
-                    x1={from.x}
-                    y1={from.y}
-                    x2={to.x}
-                    y2={to.y}
-                    onContextMenu={!isTransitioning ? (event) =>
-                      openDependencyEdgeContextMenu(event, edge.parentId, edge.childId)
-                    : undefined}
-                  />
-                  <path
-                    className={[
-                      "edge-ribbon",
-                      edge.transitionState ? `edge-${edge.transitionState}` : "",
-                      ambientEdge ? "ambient-tree" : "",
-                      active ? "active" : "",
-                      dimmed ? "dimmed" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    style={edgeStyle}
-                    d={buildPinchedEdgePath(
-                      from,
-                      to,
-                      fromWidth,
-                      toWidth,
-                      midWidth,
-                    )}
-                    fill={`url(#edge-gradient-${edge.id})`}
-                    onContextMenu={!isTransitioning ? (event) =>
-                      openDependencyEdgeContextMenu(event, edge.parentId, edge.childId)
-                    : undefined}
-                  />
-                </g>
-              );
-            })}
+                {renderState.dependencyEdges.map((edge) => {
+                  const from = displayProjected.byId[edge.parentId];
+                  const to = displayProjected.byId[edge.childId];
+                  if (!from || !to) {
+                    return null;
+                  }
+                  const ambientEdge =
+                    !selectedId && !isTransitioning && ambientFlow.dependencyEdgeIds.has(edge.id);
+                  if (!selectedId && !isTransitioning && !ambientEdge) {
+                    return null;
+                  }
+                  const edgeStyle = getLevelVisualStyle(
+                    Math.max(from.level ?? 0, to.level ?? 0),
+                    renderMaxLevel,
+                    levelSeed,
+                  );
+                  const active =
+                    selectedId &&
+                    highlightedDependencyIds.has(edge.parentId) &&
+                    highlightedDependencyIds.has(edge.childId);
+                  const dimmed = selectedId && !active;
+                  const fromRadius = getNodeRenderRadius(from);
+                  const toRadius = getNodeRenderRadius(to);
+                  const fromWidth = Math.max(1.5, fromRadius * (active ? 0.52 : 0.44));
+                  const toWidth = Math.max(1.8, toRadius * (active ? 0.56 : 0.48));
+                  const midWidth = Math.max(
+                    0.72,
+                    Math.min(fromWidth, toWidth) * (active ? 0.26 : 0.18),
+                  );
+                  return (
+                    <g key={edge.id}>
+                      <line
+                        className="edge-hit-area"
+                        x1={from.x}
+                        y1={from.y}
+                        x2={to.x}
+                        y2={to.y}
+                        onContextMenu={!isTransitioning ? (event) =>
+                          openDependencyEdgeContextMenu(event, edge.parentId, edge.childId)
+                        : undefined}
+                      />
+                      <path
+                        className={[
+                          "edge-ribbon",
+                          edge.transitionState ? `edge-${edge.transitionState}` : "",
+                          ambientEdge ? "ambient-tree" : "",
+                          active ? "active" : "",
+                          dimmed ? "dimmed" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        style={edgeStyle}
+                        d={buildPinchedEdgePath(
+                          from,
+                          to,
+                          fromWidth,
+                          toWidth,
+                          midWidth,
+                        )}
+                        fill={`url(#edge-gradient-${edge.id})`}
+                        onContextMenu={!isTransitioning ? (event) =>
+                          openDependencyEdgeContextMenu(event, edge.parentId, edge.childId)
+                        : undefined}
+                      />
+                    </g>
+                  );
+                })}
 
-            {renderState.scheduleEdges.map((rule) => {
-              if (!selectedId && !isTransitioning) {
-                return null;
-              }
-              const from = displayProjected.byId[rule.laterId];
-              const to = displayProjected.byId[rule.earlierId];
-              if (!from || !to) {
-                return null;
-              }
-              const edgeStyle = getLevelVisualStyle(
-                Math.max(from.level ?? 0, to.level ?? 0),
-                renderMaxLevel,
-                levelSeed,
-              );
-              const active =
-                selectedId &&
-                highlightedDependencyIds.has(rule.earlierId) &&
-                highlightedDependencyIds.has(rule.laterId);
-              const dimmed = selectedId && !active;
-              return (
-                <g key={rule.id}>
-                  <path
-                    className="edge-hit-area"
-                    d={buildClockwiseArcPath(to, from, {
-                      centerX: displayProjected.centerX,
-                      centerY: displayProjected.centerY,
-                      radius: displayProjected.radius,
-                      viewMode: displayViewMode,
-                      rotationX: effectiveRotationX,
-                      rotationY: effectiveRotationY,
-                    })}
-                    fill="none"
-                    onContextMenu={!isTransitioning ? (event) =>
-                      openScheduleEdgeContextMenu(event, rule.earlierId, rule.laterId)
-                    : undefined}
-                  />
-                  <path
-                  className={[
-                    "edge-line",
-                    "schedule",
-                    rule.transitionState ? `edge-${rule.transitionState}` : "",
-                    active ? "active" : "",
-                    dimmed ? "dimmed" : "",
+                {displayNodes.map((node) => {
+                  const selectedNode = node.id === selectedId;
+                  const relatedNode = !selectedNode && highlightedDependencyIds.has(node.id);
+                  const dimmedNode = selectedId && !selectedNode && !relatedNode;
+                  const radius = getNodeRenderRadius(node);
+                  const visualStyle = getLevelVisualStyle(node.level, renderMaxLevel, levelSeed);
+                  const labelOpacity = Math.max(0.3, Math.min(0.95, node.depth - 0.08));
+                  const haloClass = [
+                    "node-halo",
+                    node.transitionState ? `node-${node.transitionState}` : "",
+                    selectedNode ? "active" : "",
+                    relatedNode ? "related" : "",
+                    node.scheduled ? "scheduled" : "",
+                    node.kind === "note" ? "note" : "",
+                    dimmedNode ? "dimmed" : "",
                   ]
                     .filter(Boolean)
-                    .join(" ")}
-                  style={edgeStyle}
-                  d={buildClockwiseArcPath(to, from, {
-                    centerX: displayProjected.centerX,
-                    centerY: displayProjected.centerY,
-                    radius: displayProjected.radius,
-                    viewMode: displayViewMode,
-                    rotationX: effectiveRotationX,
-                    rotationY: effectiveRotationY,
-                  })}
-                  fill="none"
-                  markerEnd={
-                    dimmed
-                      ? "url(#schedule-arrow-dimmed)"
-                      : active
-                        ? "url(#schedule-arrow-active)"
-                        : "url(#schedule-arrow)"
-                  }
-                  onContextMenu={!isTransitioning ? (event) =>
-                    openScheduleEdgeContextMenu(event, rule.earlierId, rule.laterId)
-                  : undefined}
-                />
-                </g>
-              );
-            })}
-
-            {displayNodes.map((node) => {
-              const selectedNode = node.id === selectedId;
-              const relatedNode = !selectedNode && highlightedDependencyIds.has(node.id);
-              const dimmedNode = selectedId && !selectedNode && !relatedNode;
-              const radius = getNodeRenderRadius(node);
-              const visualStyle = getLevelVisualStyle(node.level, renderMaxLevel, levelSeed);
-              const labelOpacity = Math.max(0.3, Math.min(0.95, node.depth - 0.08));
-              const haloClass = [
-                "node-halo",
-                node.transitionState ? `node-${node.transitionState}` : "",
-                selectedNode ? "active" : "",
-                relatedNode ? "related" : "",
-                node.scheduled ? "scheduled" : "",
-                node.kind === "note" ? "note" : "",
-                dimmedNode ? "dimmed" : "",
-              ]
-                .filter(Boolean)
-                .join(" ");
-              const coreClass = [
-                "node-core",
-                node.transitionState ? `node-${node.transitionState}` : "",
-                selectedNode ? "active" : "",
-                relatedNode ? "related" : "",
-                node.scheduled ? "scheduled" : "",
-                workingId === node.id ? "working" : "",
-                node.kind === "note" ? "note" : "",
-                dimmedNode ? "dimmed" : "",
-              ]
-                .filter(Boolean)
-                .join(" ");
-              const labelClass = [
-                "node-label",
-                node.transitionState ? `node-${node.transitionState}` : "",
-                node.kind === "note" ? "note" : "",
-                dimmedNode ? "dimmed" : "",
-              ]
-                .filter(Boolean)
-                .join(" ");
-              return (
-                <g
-                  key={node.id}
-                  className={node.transitionState === "moving" ? "node-moving-group" : ""}
-                  style={{
-                    transform: `translate(${node.x}px, ${node.y}px)`,
-                    ...visualStyle,
-                  }}
-                >
-                  <circle
-                    r={radius + 6}
-                    className={haloClass}
-                    onPointerDown={(event) => {
-                      event.stopPropagation();
-                      toggleSelectedNode(node.id);
-                    }}
-                    onContextMenu={(event) => openContextMenu(event, node.id)}
-                  />
-                  <circle
-                    r={radius + 1.5}
-                    className="node-soft-edge"
-                    onPointerDown={(event) => {
-                      event.stopPropagation();
-                      toggleSelectedNode(node.id);
-                    }}
-                    onContextMenu={(event) => openContextMenu(event, node.id)}
-                  />
-                  <circle
-                    r={radius}
-                    className={coreClass}
-                    onPointerDown={(event) => {
-                      event.stopPropagation();
-                      toggleSelectedNode(node.id);
-                    }}
-                    onContextMenu={(event) => openContextMenu(event, node.id)}
-                  />
-                  <text
-                    x={radius + 7}
-                    y={-radius - 2}
-                    className={labelClass}
-                    opacity={labelOpacity}
-                    onPointerDown={(event) => {
-                      event.stopPropagation();
-                      toggleSelectedNode(node.id);
-                    }}
-                    onContextMenu={(event) => openContextMenu(event, node.id)}
-                  >
-                    {node.title}
-                  </text>
-                </g>
-              );
-            })}
+                    .join(" ");
+                  const coreClass = [
+                    "node-core",
+                    node.transitionState ? `node-${node.transitionState}` : "",
+                    selectedNode ? "active" : "",
+                    relatedNode ? "related" : "",
+                    node.scheduled ? "scheduled" : "",
+                    workingId === node.id ? "working" : "",
+                    node.kind === "note" ? "note" : "",
+                    dimmedNode ? "dimmed" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  const labelClass = [
+                    "node-label",
+                    node.transitionState ? `node-${node.transitionState}` : "",
+                    node.kind === "note" ? "note" : "",
+                    dimmedNode ? "dimmed" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  return (
+                    <g
+                      key={node.id}
+                      className={node.transitionState === "moving" ? "node-moving-group" : ""}
+                      style={{
+                        transform: `translate(${node.x}px, ${node.y}px)`,
+                        ...visualStyle,
+                      }}
+                    >
+                      <circle
+                        r={radius + 6}
+                        className={haloClass}
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          toggleSelectedNode(node.id);
+                        }}
+                        onContextMenu={(event) => openContextMenu(event, node.id)}
+                      />
+                      <circle
+                        r={radius + 1.5}
+                        className="node-soft-edge"
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          toggleSelectedNode(node.id);
+                        }}
+                        onContextMenu={(event) => openContextMenu(event, node.id)}
+                      />
+                      <circle
+                        r={radius}
+                        className={coreClass}
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          toggleSelectedNode(node.id);
+                        }}
+                        onContextMenu={(event) => openContextMenu(event, node.id)}
+                      />
+                      <text
+                        x={radius + 7}
+                        y={-radius - 2}
+                        className={labelClass}
+                        opacity={labelOpacity}
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          toggleSelectedNode(node.id);
+                        }}
+                        onContextMenu={(event) => openContextMenu(event, node.id)}
+                      >
+                        {node.title}
+                      </text>
+                    </g>
+                  );
+                })}
               </g>
             ) : null}
           </g>
         </svg>
       </section>
-      {displayedSurfaceMode ? (
-        <div
-          className={`surface-overlay ${surfaceOverlayVisible ? "visible" : "closing"}`}
-          aria-hidden={!surfaceOverlayVisible}
-          onClick={() => closeSurfaceOverlay()}
+      {displayedSurfaceMode === "list" ? (
+        <aside
+          className={`notes-overlay activity-overlay task-list-sidepanel ${surfaceOverlayVisible ? "visible" : "closing"}`}
+          onClick={(event) => event.stopPropagation()}
         >
-          <section
-            className={`surface-shell ${displayedSurfaceMode === "calendar" ? "calendar-shell" : "list-shell"}`}
-            aria-label={displayedSurfaceMode === "calendar" ? "Calendar" : "Task list"}
-            onClick={(event) => event.stopPropagation()}
+          <div
+            className={`notes-overlay-form ${selected && selectedDetails && selected.kind !== "note" ? "activity-overlay-form" : "task-list-sidepanel-form"}`}
           >
-            {displayedSurfaceMode === "list" ? (
+            <div className="notes-overlay-toolbar panel-toolbar">
+              {selected && selectedDetails && selected.kind !== "note" ? (
+                <button
+                  type="button"
+                  className="ghost-button panel-back-button"
+                  onClick={() => setSelectedId(null)}
+                >
+                  Back
+                </button>
+              ) : (
+                <span />
+              )}
+              <button
+                type="button"
+                className="overlay-icon-button"
+                onClick={() => closeSurfaceOverlay()}
+                aria-label="Close activity list"
+                title="Close activity list"
+              >
+                <ExitIcon />
+              </button>
+            </div>
+            {selected && selectedDetails && selected.kind !== "note" ? (
+              <div className="activity-overlay-body">
+                <header className="activity-overlay-header">
+                  <p className="eyebrow">ACTIVITY</p>
+                  <h2>{selected.title}</h2>
+                </header>
+                <dl className="activity-summary-list">
+                  <div className="activity-summary-row">
+                    <dt>Level</dt>
+                    <dd>{selectedDetails.level}</dd>
+                  </div>
+                  <div className="activity-summary-row">
+                    <dt>Completion in</dt>
+                    <dd>
+                      {selectedDetails.parentCount} {selectedDetails.parentCount === 1 ? "parent" : "parents"} and{" "}
+                      {formatHours(selectedDetails.chainExpectedTime)}
+                    </dd>
+                  </div>
+                  <div className="activity-summary-row">
+                    <dt>Expected work</dt>
+                    <dd>{selected.expectedEffort ?? "n/a"}</dd>
+                  </div>
+                  <div className="activity-summary-row">
+                    <dt>Work</dt>
+                    <dd>{selected.realEffort ?? "n/a"}</dd>
+                  </div>
+                  <div className="activity-summary-row">
+                    <dt>Scheduled</dt>
+                    <dd>{selectedDetails.scheduled ? "yes" : "no"}</dd>
+                  </div>
+                  <div className="activity-summary-row">
+                    <dt>Start date</dt>
+                    <dd>{selected.startDate || "n/a"}</dd>
+                  </div>
+                  <div className="activity-summary-row">
+                    <dt>Latest by</dt>
+                    <dd>{selected.bestBefore || "n/a"}</dd>
+                  </div>
+                </dl>
+              </div>
+            ) : (
               <TaskListSurface
                 graph={graph}
                 nodesById={nodesById}
                 selectedId={selectedId}
-                onSelectNode={toggleSelectedNode}
+                onSelectNode={setSelectedId}
                 onCreateRoot={() => {
                   setIsModeMenuExpanded(false);
                   openSheet({ type: "create" }, defaultForm(null));
                 }}
                 onCreateChild={openCreateChildSheet}
               />
-            ) : (
-              <CalendarSurface
-                range={calendarRange}
-                anchorDate={calendarAnchorDate}
-                onPrev={() => setCalendarAnchorDate((value) => shiftCalendarAnchor(calendarRange, value, -1))}
-                onNext={() => setCalendarAnchorDate((value) => shiftCalendarAnchor(calendarRange, value, 1))}
-                onToday={() => setCalendarAnchorDate(new Date())}
-                onRangeChange={setCalendarRange}
-                onReconcile={() => void reconcileAppleCalendar(calendarQueryRange)}
-                reconciling={calendarReconciling}
-                status={appleCalendarStatus}
-                loading={calendarLoading}
-                events={appleCalendarEvents}
-                onSelectActivity={toggleSelectedNode}
-              />
             )}
-          </section>
-        </div>
+          </div>
+        </aside>
       ) : null}
 
       {!displayedSurfaceMode && contextMenu && (
@@ -3727,17 +3522,6 @@ export default function App() {
       {!displayedSurfaceMode && selected && selectedDetails && selected.kind !== "note" && (
         <aside className="notes-overlay activity-overlay" onClick={(event) => event.stopPropagation()}>
           <div className="notes-overlay-form activity-overlay-form">
-            <div className="notes-overlay-toolbar">
-              <button
-                type="button"
-                className="overlay-icon-button"
-                onClick={() => setSelectedId(null)}
-                aria-label="Close activity details"
-                title="Close activity details"
-              >
-                <ExitIcon />
-              </button>
-            </div>
             <div className="activity-overlay-body">
               <header className="activity-overlay-header">
                 <h2>{selected.title}</h2>
