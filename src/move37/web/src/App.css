@@ -105,12 +105,15 @@
 }
 
 .topbar-actions {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
+  left: calc(50% - 3rem);
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.42rem;
+  gap: 0.5rem;
+  z-index: 34;
 }
 
 .topbar-icon-button {
@@ -318,6 +321,11 @@
   transition: opacity 500ms ease;
 }
 
+.graph-layer.blurred {
+  filter: blur(2.8px) saturate(0.84);
+  opacity: 0.56;
+}
+
 .graph-layer.hidden {
   opacity: 0;
   pointer-events: none;
@@ -332,10 +340,15 @@
   transform-origin: center;
 }
 
+.sphere-shells.blurred {
+  filter: blur(1.2px) saturate(0.92);
+  opacity: 0.8;
+}
+
 .control-dock {
   position: static;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   gap: 0.42rem;
   pointer-events: auto;
@@ -348,25 +361,19 @@
 
 .dock-import {
   position: relative;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.42rem;
+  display: block;
 }
 
 .dock-mode {
   position: relative;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.42rem;
+  display: block;
 }
 
 .dock-import-actions {
   position: absolute;
-  right: 0;
-  top: calc(100% + 0.45rem);
-  transform: translateY(-4px) scale(0.96);
+  right: calc(100% + 0.55rem);
+  top: 50%;
+  transform: translateY(-50%) translateX(4px) scale(0.96);
   display: grid;
   gap: 0.42rem;
   opacity: 0;
@@ -379,14 +386,14 @@
 .dock-import.expanded .dock-import-actions {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0) scale(1);
+  transform: translateY(-50%) translateX(0) scale(1);
 }
 
 .dock-mode-actions {
   position: absolute;
-  right: 0;
-  top: calc(100% + 0.45rem);
-  transform: translateY(-4px) scale(0.96);
+  right: calc(100% + 0.55rem);
+  top: 50%;
+  transform: translateY(-50%) translateX(4px) scale(0.96);
   display: grid;
   gap: 0.42rem;
   opacity: 0;
@@ -399,10 +406,12 @@
 .dock-mode.expanded .dock-mode-actions {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0) scale(1);
+  transform: translateY(-50%) translateX(0) scale(1);
 }
 
-.dock-button {
+.dock-button,
+.overlay-icon-button,
+.uri-search-close {
   width: 2.1rem;
   height: 2.1rem;
   display: grid;
@@ -422,7 +431,9 @@
     color 180ms ease;
 }
 
-.dock-button:hover {
+.dock-button:hover,
+.overlay-icon-button:hover,
+.uri-search-close:hover {
   transform: translateY(-1px);
   border-color: #9fe8ff5f;
   background: #102244e3;
@@ -443,13 +454,6 @@
 .dock-glyph {
   font: 700 0.75rem/1 "IBM Plex Mono", "Courier New", monospace;
   letter-spacing: 0.06em;
-}
-
-.dock-button-text {
-  width: auto;
-  min-width: 3.05rem;
-  padding: 0 0.6rem;
-  font-size: 0.68rem;
 }
 
 .dock-subaction {
@@ -490,6 +494,13 @@
   height: 0.95rem;
 }
 
+.dock-subaction.icon-only {
+  min-width: 2.1rem;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+}
+
 .sphere-shell {
   vector-effect: non-scaling-stroke;
   transition: opacity 170ms ease;
@@ -525,6 +536,7 @@
   stroke: transparent;
   stroke-width: 12;
   stroke-linecap: round;
+  fill: none;
 }
 
 .edge-line.active {
@@ -553,8 +565,9 @@
 
 .edge-line.schedule {
   stroke: var(--edge-schedule-stroke, #7ff4d7);
-  stroke-width: 1.55;
-  opacity: 0.8;
+  stroke-width: 1.45;
+  opacity: 0.82;
+  filter: drop-shadow(0 0 5px #6effde18);
 }
 
 .edge-line.schedule.active {
@@ -610,16 +623,7 @@
 }
 
 .task-list-sidepanel-form {
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-.panel-toolbar {
-  align-items: center;
-  justify-content: space-between;
-}
-
-.panel-back-button {
-  min-height: 2.1rem;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .task-list-panel {
@@ -901,6 +905,13 @@
   fill: #ffe7b8;
 }
 
+.node-halo.focus-source,
+.node-soft-edge.focus-source,
+.node-core.focus-source,
+.node-label.focus-source {
+  opacity: 0.18 !important;
+}
+
 .node-label.node-entering,
 .node-label.node-exiting {
   opacity: 0;
@@ -914,6 +925,19 @@
   transform-box: fill-box;
   transform-origin: center;
   transition: transform 170ms ease;
+}
+
+.focus-node-overlay {
+  pointer-events: none;
+}
+
+.focus-node-overlay .focus-node {
+  filter: drop-shadow(0 0 14px #9ff4ff2a);
+}
+
+.focus-node-overlay .node-label.focus-node {
+  opacity: 0.96;
+  font-size: 0.56rem;
 }
 
 @keyframes nodeFadeIn {
@@ -1036,9 +1060,11 @@
   z-index: 12;
   width: 50vw;
   height: 100dvh;
-  background: rgb(4 11 24 / 80%);
+  background: rgb(4 11 24 / 56%);
   border-left: 1px solid #8cb4ff1f;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  animation: sidePanelFadeIn 180ms ease forwards;
 }
 
 .notes-overlay-form {
@@ -1047,6 +1073,7 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 0.8rem;
   padding: 0.9rem 0.92rem 0.85rem;
+  background: rgb(9 24 44 / 28%);
 }
 
 .notes-overlay-toolbar,
@@ -1054,30 +1081,6 @@
   display: flex;
   justify-content: flex-end;
   gap: 0.48rem;
-}
-
-.overlay-icon-button {
-  width: 2.1rem;
-  height: 2.1rem;
-  display: grid;
-  place-items: center;
-  border: 1px solid #8cb4ff30;
-  background: #0b172cd4;
-  color: #d9ebff;
-  border-radius: 999px;
-  cursor: pointer;
-  transition:
-    transform 180ms ease,
-    box-shadow 220ms ease,
-    border-color 180ms ease,
-    background-color 180ms ease;
-}
-
-.overlay-icon-button:hover {
-  transform: translateY(-1px);
-  border-color: #9fe8ff5f;
-  background: #102244ee;
-  box-shadow: 0 0 18px #6cd7ff22;
 }
 
 .overlay-icon-button:disabled {
@@ -1158,6 +1161,23 @@
   color: #eef6ff;
   font: 500 0.94rem/1.45 "IBM Plex Sans", "Avenir Next", sans-serif;
   text-align: left;
+}
+
+.activity-overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.activity-overlay-actions .ghost-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.activity-overlay-actions .ghost-button svg {
+  width: 0.95rem;
+  height: 0.95rem;
 }
 
 .notes-overlay-status {
@@ -1428,7 +1448,8 @@ button.chip {
 
 .uri-search-panel {
   position: absolute;
-  left: calc(100% + 0.42rem);
+  right: calc(100% + 0.42rem);
+  left: auto;
   top: 50%;
   transform: translateY(-50%);
   width: 0;
@@ -1443,6 +1464,8 @@ button.chip {
     opacity 180ms ease,
     box-shadow 180ms ease,
     border-color 180ms ease;
+  display: flex;
+  align-items: center;
 }
 
 .uri-search.expanded .uri-search-panel {
@@ -1453,17 +1476,29 @@ button.chip {
 }
 
 .uri-search-panel input {
-  width: 100%;
+  flex: 1;
   border: 0;
   outline: 0;
   background: transparent;
   color: #d9ebff;
-  padding: 0.58rem 0.82rem;
+  padding: 0.58rem 0.25rem 0.58rem 0.82rem;
   font: 500 0.76rem/1.2 "IBM Plex Mono", "Courier New", monospace;
 }
 
 .uri-search-panel input::placeholder {
   color: #6d83a6;
+}
+
+.uri-search-close {
+  flex: 0 0 auto;
+  margin-right: 0.2rem;
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.uri-search-close svg {
+  width: 0.85rem;
+  height: 0.85rem;
 }
 
 .action-button {
@@ -1478,6 +1513,24 @@ button.chip {
   padding: 0 0.72rem;
   width: auto;
   font: 700 0.68rem/1 "IBM Plex Mono", "Courier New", monospace;
+}
+
+.work-focus-hud {
+  position: fixed;
+  left: 50%;
+  top: calc(50% + 4.6rem);
+  transform: translateX(-50%);
+  z-index: 15;
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  pointer-events: auto;
+}
+
+.work-focus-timer {
+  color: #f3fbff;
+  font: 700 1.5rem/1 "Sora", "Avenir Next", sans-serif;
+  text-shadow: 0 0 20px #9ceaff18;
 }
 
 .surface-actions .ghost-button.active {
@@ -1720,6 +1773,17 @@ button.chip {
   }
 }
 
+@keyframes sidePanelFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 @media (max-width: 1100px) {
   .task-list-item {
     gap: 0.7rem;
@@ -1751,41 +1815,37 @@ button.chip {
   }
 
   .topbar-actions {
-    position: static;
     left: auto;
+    right: 0.75rem;
+    top: auto;
+    bottom: 0.9rem;
     transform: none;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    max-width: min(72vw, 28rem);
   }
 
   .control-dock {
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    flex-direction: column;
   }
 
   .dock-import-actions {
-    right: 0;
-    left: auto;
-    top: calc(100% + 0.4rem);
+    right: calc(100% + 0.45rem);
+    top: 50%;
     bottom: auto;
-    transform: translateY(-4px) scale(0.96);
+    transform: translateY(-50%) translateX(4px) scale(0.96);
   }
 
   .dock-import.expanded .dock-import-actions {
-    transform: translateY(0) scale(1);
+    transform: translateY(-50%) translateX(0) scale(1);
   }
 
   .dock-mode-actions {
-    right: 0;
-    left: auto;
-    top: calc(100% + 0.4rem);
+    right: calc(100% + 0.45rem);
+    top: 50%;
     bottom: auto;
-    transform: translateY(-4px) scale(0.96);
+    transform: translateY(-50%) translateX(4px) scale(0.96);
   }
 
   .dock-mode.expanded .dock-mode-actions {
-    transform: translateY(0) scale(1);
+    transform: translateY(-50%) translateX(0) scale(1);
   }
 
   .field-row,
@@ -1827,7 +1887,7 @@ button.chip {
   }
 
   .uri-search.expanded .uri-search-panel {
-    width: min(14rem, calc(100vw - 5rem));
+    width: min(14rem, calc(100vw - 6.8rem));
   }
 
   .surface-content {

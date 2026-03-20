@@ -13,11 +13,11 @@ export default defineConfig({
   server: {
     proxy: {
       "/v1": {
-        target: process.env.MOVE37_VITE_API_PROXY_TARGET || "http://localhost:8080",
+        target: process.env.MOVE37_VITE_API_PROXY_TARGET || "http://localhost:18080",
         changeOrigin: true,
       },
       "/health": {
-        target: process.env.MOVE37_VITE_API_PROXY_TARGET || "http://localhost:8080",
+        target: process.env.MOVE37_VITE_API_PROXY_TARGET || "http://localhost:18080",
         changeOrigin: true,
       },
     },

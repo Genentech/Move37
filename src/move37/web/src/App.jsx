@@ -359,65 +359,39 @@ function projectSpatialPoint({ point, centerX, centerY, radius, rotationX, rotat
   };
 }
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function buildClockwiseArcPath(from, to, options) {
   if (from.level !== to.level || from.radialRatio == null || to.radialRatio == null) {
     return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
   }
 
-  if (options.viewMode === "3d") {
-    const startAngle = Math.atan2(from.y - options.centerY, from.x - options.centerX);
-    let delta = Math.atan2(to.y - options.centerY, to.x - options.centerX) - startAngle;
-    while (delta <= 0) {
-      delta += Math.PI * 2;
-    }
-    const steps = Math.max(12, Math.ceil(delta / (Math.PI / 18)));
-    const fromDistance = Math.hypot(from.x - options.centerX, from.y - options.centerY);
-    const toDistance = Math.hypot(to.x - options.centerX, to.y - options.centerY);
-    const arcRadius = Math.max(fromDistance, toDistance) + 14;
-    let path = "";
-
-    for (let index = 0; index <= steps; index += 1) {
-      const angle = startAngle + (delta * index) / steps;
-      const x = options.centerX + Math.cos(angle) * arcRadius;
-      const y = options.centerY + Math.sin(angle) * arcRadius;
-      path += `${index === 0 ? "M" : " L"} ${x} ${y}`;
-    }
-
-    return path;
-  }
-
-  let delta = to.angle - from.angle;
+  const startAngle = Math.atan2(from.y - options.centerY, from.x - options.centerX);
+  let delta = Math.atan2(to.y - options.centerY, to.x - options.centerX) - startAngle;
   while (delta <= 0) {
     delta += Math.PI * 2;
   }
-  const steps = Math.max(10, Math.ceil(delta / (Math.PI / 18)));
-  const arcRatio = Math.min(0.98, Math.max(from.radialRatio, to.radialRatio) + 0.045);
-  const startPoint = projectLevelPoint({
-    angle: from.angle,
-    radialRatio: arcRatio,
-    centerX: options.centerX,
-    centerY: options.centerY,
-    radius: options.radius,
-    viewMode: options.viewMode,
-    rotationX: options.rotationX,
-    rotationY: options.rotationY,
-  });
-  let path = `M ${startPoint.x} ${startPoint.y}`;
+  const fromDistance = Math.hypot(from.x - options.centerX, from.y - options.centerY);
+  const toDistance = Math.hypot(to.x - options.centerX, to.y - options.centerY);
+  const averageRadius = (fromDistance + toDistance) / 2;
+  const steps = Math.max(12, Math.ceil(delta / (Math.PI / 20)));
+  const outwardBend = Math.min(18, Math.max(5, averageRadius * 0.04));
+  let path = `M ${from.x} ${from.y}`;
 
-  for (let index = 1; index <= steps; index += 1) {
-    const angle = from.angle + (delta * index) / steps;
-    const point = projectLevelPoint({
-      angle,
-      radialRatio: arcRatio,
-      centerX: options.centerX,
-      centerY: options.centerY,
-      radius: options.radius,
-      viewMode: options.viewMode,
-      rotationX: options.rotationX,
-      rotationY: options.rotationY,
-    });
+  for (let index = 1; index < steps; index += 1) {
+    const t = index / steps;
+    const angle = startAngle + delta * t;
+    const radius = fromDistance + (toDistance - fromDistance) * t + Math.sin(Math.PI * t) * outwardBend;
+    const point = {
+      x: options.centerX + Math.cos(angle) * radius,
+      y: options.centerY + Math.sin(angle) * radius,
+    };
     path += ` L ${point.x} ${point.y}`;
   }
+
+  path += ` L ${to.x} ${to.y}`;
 
   return path;
 }
@@ -544,6 +518,55 @@ function SearchIcon() {
         d="M10.5 3.5a7 7 0 1 0 4.24 12.58l4.84 4.84a1 1 0 1 0 1.42-1.42l-4.84-4.84A7 7 0 0 0 10.5 3.5Zm0 2a5 5 0 1 1 0 10a5 5 0 0 1 0-10Z"
         fill="currentColor"
       />
+    </svg>
+  );
+}
+
+function BackIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M14.8 6.2L8.7 12l6.1 5.8" className="icon-map-line" />
+      <path d="M9.4 12h8.4" className="icon-map-line" />
+    </svg>
+  );
+}
+
+function ZoomResetIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7.2 4.8H4.8v2.4" className="icon-map-line" />
+      <path d="M16.8 4.8h2.4v2.4" className="icon-map-line" />
+      <path d="M19.2 16.8v2.4h-2.4" className="icon-map-line" />
+      <path d="M7.2 19.2H4.8v-2.4" className="icon-map-line" />
+      <path d="M9.2 9.2l2.8 2.8l2.8-2.8" className="icon-map-line" />
+      <path d="M12 12V7.8" className="icon-map-line" />
+      <path d="M9.2 14.8l2.8-2.8l2.8 2.8" className="icon-map-line" />
+      <path d="M12 12v4.2" className="icon-map-line" />
+    </svg>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M8.4 6.4l8.6 5.6l-8.6 5.6z" className="icon-map-outline" />
+    </svg>
+  );
+}
+
+function PauseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M8.2 6.2v11.6" className="icon-map-line" />
+      <path d="M15.8 6.2v11.6" className="icon-map-line" />
+    </svg>
+  );
+}
+
+function StopIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7.2 7.2h9.6v9.6H7.2z" className="icon-map-outline" />
     </svg>
   );
 }
@@ -680,6 +703,50 @@ function buildSelectedDetails(node, layout, graph, now) {
     parents: directParents,
     children: directChildren,
   };
+}
+
+function ActivitySummaryBody({ node, details }) {
+  return (
+    <div className="activity-overlay-body">
+      <header className="activity-overlay-header">
+        <p className="eyebrow">ACTIVITY</p>
+        <h2>{node.title}</h2>
+      </header>
+      <dl className="activity-summary-list">
+        <div className="activity-summary-row">
+          <dt>Level</dt>
+          <dd>{details.level}</dd>
+        </div>
+        <div className="activity-summary-row">
+          <dt>Completion in</dt>
+          <dd>
+            {details.parentCount} {details.parentCount === 1 ? "parent" : "parents"} and{" "}
+            {formatHours(details.chainExpectedTime)}
+          </dd>
+        </div>
+        <div className="activity-summary-row">
+          <dt>Expected work</dt>
+          <dd>{node.expectedEffort ?? "n/a"}</dd>
+        </div>
+        <div className="activity-summary-row">
+          <dt>Work</dt>
+          <dd>{node.realEffort ?? "n/a"}</dd>
+        </div>
+        <div className="activity-summary-row">
+          <dt>Scheduled</dt>
+          <dd>{details.scheduled ? "yes" : "no"}</dd>
+        </div>
+        <div className="activity-summary-row">
+          <dt>Start date</dt>
+          <dd>{node.startDate || "n/a"}</dd>
+        </div>
+        <div className="activity-summary-row">
+          <dt>Latest by</dt>
+          <dd>{node.bestBefore || "n/a"}</dd>
+        </div>
+      </dl>
+    </div>
+  );
 }
 
 function computeFocusRotation(point) {
@@ -990,6 +1057,24 @@ function buildLevelShells(maxLevel, sessionSeed = 0) {
 }
 
 export default function App() {
+  const defaultLocalToken = useMemo(() => {
+    if (import.meta.env.VITE_MOVE37_API_TOKEN) {
+      return import.meta.env.VITE_MOVE37_API_TOKEN;
+    }
+    if (!import.meta.env.DEV) {
+      return undefined;
+    }
+    const hostname = window.location.hostname.toLowerCase();
+    if (
+      hostname === "localhost"
+      || hostname === "127.0.0.1"
+      || hostname === "0.0.0.0"
+      || hostname.endsWith(".local")
+    ) {
+      return "move37-dev-token";
+    }
+    return undefined;
+  }, []);
   const shellRef = useRef(null);
   const searchInputRef = useRef(null);
   const urlInputRef = useRef(null);
@@ -1006,9 +1091,9 @@ export default function App() {
   const apiOptions = useMemo(
     () => ({
       baseUrl: import.meta.env.VITE_MOVE37_API_BASE_URL || "",
-      token: import.meta.env.VITE_MOVE37_API_TOKEN,
+      token: defaultLocalToken,
     }),
-    [],
+    [defaultLocalToken],
   );
   const [surfaceMode, setSurfaceMode] = useState("graph");
   const [viewMode, setViewMode] = useState("3d");
@@ -1072,6 +1157,7 @@ export default function App() {
     dependencyEdgeIds: new Set(),
   });
   const [workingId, setWorkingId] = useState(null);
+  const [focusedWorkId, setFocusedWorkId] = useState(null);
   const isTransitioning = transition != null;
   const isMorphing = modeMorph != null;
   const displayViewMode = modeMorph ? modeMorph.to : viewMode;
@@ -1179,7 +1265,7 @@ export default function App() {
   useEffect(() => {
     const shouldRotate3D =
       (!isMorphing && viewMode === "3d") || (isMorphing && modeMorph.to === "3d");
-    if (graphSuspended || workingId || !shouldRotate3D || isPointerDown) {
+    if (graphSuspended || !shouldRotate3D || isPointerDown) {
       return undefined;
     }
     let frame = 0;
@@ -1195,10 +1281,10 @@ export default function App() {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [graphSuspended, isMorphing, isPointerDown, modeMorph?.to, viewMode, workingId]);
+  }, [graphSuspended, isMorphing, isPointerDown, modeMorph?.to, viewMode]);
 
   useEffect(() => {
-    if (graphSuspended || workingId || viewMode !== "2d" || isPointerDown || isMorphing) {
+    if (graphSuspended || viewMode !== "2d" || isPointerDown || isMorphing) {
       return undefined;
     }
     let frame = 0;
@@ -1214,7 +1300,7 @@ export default function App() {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [graphSuspended, isMorphing, isPointerDown, viewMode, workingId]);
+  }, [graphSuspended, isMorphing, isPointerDown, viewMode]);
 
   useEffect(
     () => () => {
@@ -1385,12 +1471,14 @@ export default function App() {
   );
   const nodeLayout = useMemo(() => buildNodeLayoutMap(graph, layout, rotation2D), [graph, layout, rotation2D]);
 
+  const focusNodeId = focusedWorkId || workingId;
   const workingNode = workingId ? nodesById.get(workingId) || null : null;
+  const focusNode = focusNodeId ? nodesById.get(focusNodeId) || null : null;
   const workingPoint = useMemo(() => {
-    if (!workingNode) {
+    if (!focusNodeId || !focusNode) {
       return null;
     }
-    const spatial = nodeLayout.get(workingId);
+    const spatial = nodeLayout.get(focusNodeId);
     if (!spatial) {
       return null;
     }
@@ -1399,11 +1487,12 @@ export default function App() {
       y: spatial.point3d?.y ?? Math.sin(spatial.angle) * spatial.radialRatio,
       z: spatial.point3d?.z ?? 0,
     };
-  }, [nodeLayout, workingId, workingNode]);
+  }, [focusNode, focusNodeId, nodeLayout]);
   const focusRotation = useMemo(() => computeFocusRotation(workingPoint), [workingPoint]);
-  const effectiveRotationX = workingId && focusRotation ? focusRotation.rotationX : rotationX;
+  const effectiveRotationX = focusNodeId && focusRotation ? focusRotation.rotationX : rotationX;
   const effectiveRotationY =
-    workingId && focusRotation ? focusRotation.rotationY : rotationY + autoRotation;
+    focusNodeId && focusRotation ? focusRotation.rotationY + autoRotation : rotationY + autoRotation;
+  const effectivePanOffset = focusNodeId ? { x: 0, y: 0 } : panOffset;
 
   const projected = useMemo(
     () =>
@@ -1413,9 +1502,9 @@ export default function App() {
         viewMode,
         rotationX: effectiveRotationX,
         rotationY: effectiveRotationY,
-        panOffset,
+        panOffset: effectivePanOffset,
       }),
-    [effectiveRotationX, effectiveRotationY, graph, nodeLayout, panOffset, size, viewMode, zoom],
+    [effectivePanOffset, effectiveRotationX, effectiveRotationY, graph, nodeLayout, size, viewMode, zoom],
   );
   const projected2D = useMemo(
     () =>
@@ -1425,9 +1514,9 @@ export default function App() {
         viewMode: "2d",
         rotationX: effectiveRotationX,
         rotationY: effectiveRotationY,
-        panOffset,
+        panOffset: effectivePanOffset,
       }),
-    [effectiveRotationX, effectiveRotationY, graph, nodeLayout, panOffset, size, zoom],
+    [effectivePanOffset, effectiveRotationX, effectiveRotationY, graph, nodeLayout, size, zoom],
   );
   const projected3D = useMemo(
     () =>
@@ -1437,9 +1526,9 @@ export default function App() {
         viewMode: "3d",
         rotationX: effectiveRotationX,
         rotationY: effectiveRotationY,
-        panOffset,
+        panOffset: effectivePanOffset,
       }),
-    [effectiveRotationX, effectiveRotationY, graph, nodeLayout, panOffset, size, zoom],
+    [effectivePanOffset, effectiveRotationX, effectiveRotationY, graph, nodeLayout, size, zoom],
   );
 
   const transitionFromNodeLayout = useMemo(
@@ -1461,10 +1550,11 @@ export default function App() {
             viewMode,
             rotationX: effectiveRotationX,
             rotationY: effectiveRotationY,
-            panOffset,
+            panOffset: effectivePanOffset,
           })
         : null,
     [
+      effectivePanOffset,
       effectiveRotationX,
       effectiveRotationY,
       size,
@@ -1472,7 +1562,6 @@ export default function App() {
       transitionFromNodeLayout,
       viewMode,
       zoom,
-      panOffset,
     ],
   );
   const transitionToProjected = useMemo(
@@ -1484,10 +1573,11 @@ export default function App() {
             viewMode,
             rotationX: effectiveRotationX,
             rotationY: effectiveRotationY,
-            panOffset,
+            panOffset: effectivePanOffset,
           })
         : null,
     [
+      effectivePanOffset,
       effectiveRotationX,
       effectiveRotationY,
       size,
@@ -1495,7 +1585,6 @@ export default function App() {
       transitionToNodeLayout,
       viewMode,
       zoom,
-      panOffset,
     ],
   );
 
@@ -1718,11 +1807,11 @@ export default function App() {
   }, [displayProjected, renderState.nodes]);
   const staticShellProjection = useMemo(
     () => ({
-      centerX: size.width / 2 + panOffset.x,
-      centerY: size.height / 2 + panOffset.y,
+      centerX: size.width / 2 + effectivePanOffset.x,
+      centerY: size.height / 2 + effectivePanOffset.y,
       radius: Math.min(size.width, size.height) * 0.39 * zoom,
     }),
-    [panOffset, size.height, size.width, zoom],
+    [effectivePanOffset.x, effectivePanOffset.y, size.height, size.width, zoom],
   );
   const sphereProjection = graphSuspended ? staticShellProjection : displayProjected;
   const showDynamicGraph = !graphSuspended;
@@ -1731,6 +1820,12 @@ export default function App() {
     const active = graph.nodes.find((node) => node.workStartedAt);
     setWorkingId(active?.id || null);
   }, [graph]);
+
+  useEffect(() => {
+    if (focusedWorkId && !nodesById.has(focusedWorkId)) {
+      setFocusedWorkId(null);
+    }
+  }, [focusedWorkId, nodesById]);
 
   useEffect(() => {
     if (workingId) {
@@ -1877,6 +1972,11 @@ export default function App() {
     void runSearch();
   }
 
+  function closeSearchCommand() {
+    setIsSearchExpanded(false);
+    setSearchQuery("");
+  }
+
   function toggleImportMenu() {
     setImportPopoverMode(null);
     setIsImportMenuExpanded((value) => !value);
@@ -1944,7 +2044,7 @@ export default function App() {
     stopViewportTween();
     setIsPointerDown(true);
     const backgroundTarget = isBackgroundTarget(event.target, event.currentTarget);
-    if (event.button !== 0 || workingId || isMorphing || !backgroundTarget) {
+    if (event.button !== 0 || isMorphing || !backgroundTarget) {
       return;
     }
     const panDrag = event.ctrlKey || event.metaKey;
@@ -1970,7 +2070,7 @@ export default function App() {
   }
 
   function onPointerMove(event) {
-    if (!dragRef.current.active || workingId) {
+    if (!dragRef.current.active) {
       return;
     }
     if (dragRef.current.mode === "pan") {
@@ -2315,7 +2415,6 @@ export default function App() {
         setLeftPanel(null);
         setActiveNote(null);
         setNoteDraft("");
-        setChatInput("");
         recenterView();
       }
     } catch (nextError) {
@@ -2465,6 +2564,11 @@ export default function App() {
     if (isTransitioning) {
       return;
     }
+    if (surfaceMode !== "graph" || surfaceClosingMode) {
+      closeSurfaceOverlay();
+    }
+    setSelectedId(nodeId);
+    setFocusedWorkId(nodeId);
     runLightweightMutation(
       (draft) => {
         draft.nodes.forEach((node) => {
@@ -2502,7 +2606,6 @@ export default function App() {
         }),
     );
     setContextMenu(null);
-    setSelectedId(nodeId);
   }
 
   function stopWork(nodeId) {
@@ -2535,6 +2638,24 @@ export default function App() {
         ),
     );
     setContextMenu(null);
+  }
+
+  function toggleFocusedWorkPlayback() {
+    if (!focusNode) {
+      return;
+    }
+    if (focusNode.workStartedAt) {
+      stopWork(focusNode.id);
+      return;
+    }
+    startWork(focusNode.id);
+  }
+
+  function stopFocusedSession() {
+    if (focusNode?.workStartedAt) {
+      stopWork(focusNode.id);
+    }
+    setFocusedWorkId(null);
   }
 
   function forkNode(nodeId) {
@@ -2750,6 +2871,15 @@ export default function App() {
     }
   }
 
+  const hasActivitySelection = Boolean(selected && selectedDetails && selected.kind !== "note");
+  const isListMode = displayedSurfaceMode === "list";
+  const showActivityInspector = hasActivitySelection && leftPanel !== "note-editor" && !focusNodeId;
+  const focusProjectedNode = focusNodeId ? displayProjected.byId[focusNodeId] || null : null;
+  const isZoomAdjusted = Math.abs(zoom - defaultViewport.zoom) > 0.001;
+  const isPanAdjusted =
+    Math.abs(panOffset.x - defaultViewport.panOffset.x) > 0.5 ||
+    Math.abs(panOffset.y - defaultViewport.panOffset.y) > 0.5;
+
   return (
     <main
       className="app-shell"
@@ -2769,7 +2899,7 @@ export default function App() {
               <button
                 type="submit"
                 form="notes-editor-form"
-                className="topbar-icon-button topbar-control-button"
+                className="dock-button"
                 aria-label="Save note"
                 title="Save note"
               >
@@ -2777,7 +2907,7 @@ export default function App() {
               </button>
               <button
                 type="button"
-                className="topbar-icon-button topbar-control-button"
+                className="dock-button"
                 onClick={closeLeftPanel}
                 aria-label="Exit note editor"
                 title="Exit note editor"
@@ -2786,10 +2916,65 @@ export default function App() {
               </button>
             </>
           ) : null}
-          {!displayedSurfaceMode && selected && selectedDetails && selected.kind !== "note" ? (
+          {isListMode && hasActivitySelection ? (
             <button
               type="button"
-              className="topbar-icon-button topbar-control-button"
+              className="dock-button"
+              onClick={() => setSelectedId(null)}
+              aria-label="Return to list"
+              title="Return to list"
+            >
+              <BackIcon />
+            </button>
+          ) : null}
+          {isListMode ? (
+            <button
+              type="button"
+              className="dock-button"
+              onClick={() => closeSurfaceOverlay()}
+              aria-label="Close activity list"
+              title="Close activity list"
+            >
+              <ExitIcon />
+            </button>
+          ) : null}
+          {selected && selected.kind !== "note" && !focusNodeId ? (
+            <button
+              type="button"
+              className="dock-button"
+              onClick={() => startWork(selected.id)}
+              aria-label="Start activity"
+              title="Start activity"
+            >
+              <PlayIcon />
+            </button>
+          ) : null}
+          {focusNode ? (
+            <button
+              type="button"
+              className="dock-button"
+              onClick={toggleFocusedWorkPlayback}
+              aria-label={focusNode.workStartedAt ? "Pause activity" : "Resume activity"}
+              title={focusNode.workStartedAt ? "Pause activity" : "Resume activity"}
+            >
+              {focusNode.workStartedAt ? <PauseIcon /> : <PlayIcon />}
+            </button>
+          ) : null}
+          {focusNode ? (
+            <button
+              type="button"
+              className="dock-button"
+              onClick={stopFocusedSession}
+              aria-label="Stop focus"
+              title="Stop focus"
+            >
+              <StopIcon />
+            </button>
+          ) : null}
+          {!displayedSurfaceMode && hasActivitySelection ? (
+            <button
+              type="button"
+              className="dock-button"
               onClick={() => setSelectedId(null)}
               aria-label="Close activity details"
               title="Close activity details"
@@ -2814,19 +2999,30 @@ export default function App() {
               </button>
               <div className="uri-search-panel">
                 {isSearchExpanded ? (
-                  <input
-                    ref={searchInputRef}
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        void runSearch();
-                      }
-                    }}
-                    placeholder={SEARCH_PLACEHOLDER}
-                    aria-label="Search activity"
-                  />
+                  <>
+                    <input
+                      ref={searchInputRef}
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void runSearch();
+                        }
+                      }}
+                      placeholder={SEARCH_PLACEHOLDER}
+                      aria-label="Search activity"
+                    />
+                    <button
+                      type="button"
+                      className="uri-search-close"
+                      onClick={closeSearchCommand}
+                      aria-label="Close search"
+                      title="Close search"
+                    >
+                      <ExitIcon />
+                    </button>
+                  </>
                 ) : null}
               </div>
             </div>
@@ -2846,30 +3042,27 @@ export default function App() {
               <div className="dock-mode-actions" aria-hidden={!isModeMenuExpanded}>
                 <button
                   type="button"
-                  className={`dock-subaction ${surfaceMode === "graph" && viewMode === "2d" ? "active" : ""}`}
+                  className={`dock-subaction icon-only ${surfaceMode === "graph" && viewMode === "2d" ? "active" : ""}`}
                   onClick={() => switchViewMode("2d")}
                   title="2D view"
                 >
                   <RingsIcon />
-                  <span>2D</span>
                 </button>
                 <button
                   type="button"
-                  className={`dock-subaction ${surfaceMode === "graph" && viewMode === "3d" ? "active" : ""}`}
+                  className={`dock-subaction icon-only ${surfaceMode === "graph" && viewMode === "3d" ? "active" : ""}`}
                   onClick={() => switchViewMode("3d")}
                   title="3D view"
                 >
                   <GlobeIcon />
-                  <span>3D</span>
                 </button>
                 <button
                   type="button"
-                  className={`dock-subaction ${surfaceMode === "list" ? "active" : ""}`}
+                  className={`dock-subaction icon-only ${surfaceMode === "list" ? "active" : ""}`}
                   onClick={openListSurface}
                   title="List view"
                 >
                   <ListIcon />
-                  <span>List</span>
                 </button>
               </div>
             </div>
@@ -2927,21 +3120,20 @@ export default function App() {
                 onChange={handleBrowseInputChange}
               />
             </div>
-            {Math.abs(zoom - defaultViewport.zoom) > 0.001 ? (
+            {isZoomAdjusted ? (
               <button
                 type="button"
-                className="dock-button dock-button-text"
+                className="dock-button"
                 onClick={() => {
                   animateViewport({ zoom: defaultViewport.zoom });
                 }}
-                aria-label="Reset zoom to 100%"
-                title="100%"
+                aria-label="Reset zoom"
+                title="Reset zoom"
               >
-                100%
+                <ZoomResetIcon />
               </button>
             ) : null}
-            {Math.abs(panOffset.x - defaultViewport.panOffset.x) > 0.5 ||
-            Math.abs(panOffset.y - defaultViewport.panOffset.y) > 0.5 ? (
+            {isPanAdjusted ? (
               <button
                 type="button"
                 className="dock-button"
@@ -3030,7 +3222,7 @@ export default function App() {
 
       <section
         ref={shellRef}
-        className={`sphere-area view-${displayViewMode} ${isDragging ? "dragging" : ""} ${searchState} ${leftPanel ? "panel-open" : ""} ${displayedSurfaceMode ? "surface-open" : ""}`}
+        className={`sphere-area view-${displayViewMode} ${isDragging ? "dragging" : ""} ${searchState} ${leftPanel ? "panel-open" : ""} ${displayedSurfaceMode ? "surface-open" : ""} ${focusNodeId ? "work-focus" : ""}`}
         aria-label="Activity dependency network"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -3065,6 +3257,18 @@ export default function App() {
               <stop offset="82%" stopColor="#01040c96" />
               <stop offset="100%" stopColor="#000209d6" />
             </radialGradient>
+            <marker
+              id="schedule-arrow"
+              viewBox="0 0 12 12"
+              refX="10.2"
+              refY="6"
+              markerWidth="7"
+              markerHeight="7"
+              markerUnits="strokeWidth"
+              orient="auto"
+            >
+              <path d="M1.6 1.2L10.2 6L1.6 10.8L4.1 6z" fill="context-stroke" />
+            </marker>
             {showDynamicGraph
               ? renderState.dependencyEdges.map((edge) => {
                   const from = displayProjected.byId[edge.parentId];
@@ -3118,7 +3322,7 @@ export default function App() {
             fill="url(#sphere-halo-failure)"
           />
           <g className="graph-viewport">
-            <g className="sphere-shells" aria-hidden="true">
+            <g className={`sphere-shells ${focusNodeId ? "blurred" : ""}`} aria-hidden="true">
               {[...renderState.levelShells].reverse().map((shell) => {
                 const shellRadius = sphereProjection.radius * shell.ratio;
                 return (
@@ -3141,7 +3345,7 @@ export default function App() {
             </g>
 
             {showDynamicGraph ? (
-              <g className={`graph-layer ${nodesVisible ? "visible" : "hidden"}`}>
+              <g className={`graph-layer ${nodesVisible ? "visible" : "hidden"} ${focusNodeId ? "blurred" : ""}`}>
                 {renderState.dependencyEdges.map((edge) => {
                   const from = displayProjected.byId[edge.parentId];
                   const to = displayProjected.byId[edge.childId];
@@ -3210,6 +3414,67 @@ export default function App() {
                   );
                 })}
 
+                {renderState.scheduleEdges.map((edge) => {
+                  const from = displayProjected.byId[edge.earlierId];
+                  const to = displayProjected.byId[edge.laterId];
+                  if (!from || !to || from.level !== to.level) {
+                    return null;
+                  }
+                  const active =
+                    selectedId &&
+                    highlightedDependencyIds.has(edge.earlierId) &&
+                    highlightedDependencyIds.has(edge.laterId);
+                  const dimmed = selectedId && !active;
+                  const scheduleStyle = getLevelVisualStyle(
+                    Math.max(from.level ?? 0, to.level ?? 0),
+                    renderMaxLevel,
+                    levelSeed,
+                  );
+                  return (
+                    <g key={edge.id}>
+                      <path
+                        className="edge-hit-area"
+                        d={buildClockwiseArcPath(from, to, {
+                          centerX: sphereProjection.centerX,
+                          centerY: sphereProjection.centerY,
+                          radius: sphereProjection.radius,
+                          viewMode: displayViewMode,
+                          rotationX: effectiveRotationX,
+                          rotationY: effectiveRotationY,
+                        })}
+                        onContextMenu={!isTransitioning ? (event) =>
+                          openScheduleEdgeContextMenu(event, edge.earlierId, edge.laterId)
+                        : undefined}
+                      />
+                      <path
+                        className={[
+                          "edge-line",
+                          "schedule",
+                          edge.transitionState ? `edge-${edge.transitionState}` : "",
+                          active ? "active" : "",
+                          dimmed ? "dimmed" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        style={scheduleStyle}
+                        d={buildClockwiseArcPath(from, to, {
+                          centerX: sphereProjection.centerX,
+                          centerY: sphereProjection.centerY,
+                          radius: sphereProjection.radius,
+                          viewMode: displayViewMode,
+                          rotationX: effectiveRotationX,
+                          rotationY: effectiveRotationY,
+                        })}
+                        fill="none"
+                        markerEnd="url(#schedule-arrow)"
+                        onContextMenu={!isTransitioning ? (event) =>
+                          openScheduleEdgeContextMenu(event, edge.earlierId, edge.laterId)
+                        : undefined}
+                      />
+                    </g>
+                  );
+                })}
+
                 {displayNodes.map((node) => {
                   const selectedNode = node.id === selectedId;
                   const relatedNode = !selectedNode && highlightedDependencyIds.has(node.id);
@@ -3225,6 +3490,7 @@ export default function App() {
                     node.scheduled ? "scheduled" : "",
                     node.kind === "note" ? "note" : "",
                     dimmedNode ? "dimmed" : "",
+                    focusNodeId === node.id ? "focus-source" : "",
                   ]
                     .filter(Boolean)
                     .join(" ");
@@ -3237,6 +3503,7 @@ export default function App() {
                     workingId === node.id ? "working" : "",
                     node.kind === "note" ? "note" : "",
                     dimmedNode ? "dimmed" : "",
+                    focusNodeId === node.id ? "focus-source" : "",
                   ]
                     .filter(Boolean)
                     .join(" ");
@@ -3245,6 +3512,7 @@ export default function App() {
                     node.transitionState ? `node-${node.transitionState}` : "",
                     node.kind === "note" ? "note" : "",
                     dimmedNode ? "dimmed" : "",
+                    focusNodeId === node.id ? "focus-source" : "",
                   ]
                     .filter(Boolean)
                     .join(" ");
@@ -3302,6 +3570,26 @@ export default function App() {
                 })}
               </g>
             ) : null}
+            {showDynamicGraph && focusProjectedNode ? (
+              <g
+                className="focus-node-overlay"
+                style={{
+                  transform: `translate(${focusProjectedNode.x}px, ${focusProjectedNode.y}px)`,
+                  ...getLevelVisualStyle(focusProjectedNode.level, renderMaxLevel, levelSeed),
+                }}
+              >
+                <circle r={getNodeRenderRadius(focusProjectedNode) * 2.55} className="node-halo active focus-node" />
+                <circle r={getNodeRenderRadius(focusProjectedNode) * 1.48} className="node-soft-edge focus-node" />
+                <circle r={getNodeRenderRadius(focusProjectedNode) * 1.36} className="node-core working focus-node" />
+                <text
+                  x={getNodeRenderRadius(focusProjectedNode) * 1.36 + 9}
+                  y={-getNodeRenderRadius(focusProjectedNode) * 1.36 - 4}
+                  className="node-label focus-node"
+                >
+                  {focusProjectedNode.title}
+                </text>
+              </g>
+            ) : null}
           </g>
         </svg>
       </section>
@@ -3310,84 +3598,18 @@ export default function App() {
           className={`notes-overlay activity-overlay task-list-sidepanel ${surfaceOverlayVisible ? "visible" : "closing"}`}
           onClick={(event) => event.stopPropagation()}
         >
-          <div
-            className={`notes-overlay-form ${selected && selectedDetails && selected.kind !== "note" ? "activity-overlay-form" : "task-list-sidepanel-form"}`}
-          >
-            <div className="notes-overlay-toolbar panel-toolbar">
-              {selected && selectedDetails && selected.kind !== "note" ? (
-                <button
-                  type="button"
-                  className="ghost-button panel-back-button"
-                  onClick={() => setSelectedId(null)}
-                >
-                  Back
-                </button>
-              ) : (
-                <span />
-              )}
-              <button
-                type="button"
-                className="overlay-icon-button"
-                onClick={() => closeSurfaceOverlay()}
-                aria-label="Close activity list"
-                title="Close activity list"
-              >
-                <ExitIcon />
-              </button>
-            </div>
-            {selected && selectedDetails && selected.kind !== "note" ? (
-              <div className="activity-overlay-body">
-                <header className="activity-overlay-header">
-                  <p className="eyebrow">ACTIVITY</p>
-                  <h2>{selected.title}</h2>
-                </header>
-                <dl className="activity-summary-list">
-                  <div className="activity-summary-row">
-                    <dt>Level</dt>
-                    <dd>{selectedDetails.level}</dd>
-                  </div>
-                  <div className="activity-summary-row">
-                    <dt>Completion in</dt>
-                    <dd>
-                      {selectedDetails.parentCount} {selectedDetails.parentCount === 1 ? "parent" : "parents"} and{" "}
-                      {formatHours(selectedDetails.chainExpectedTime)}
-                    </dd>
-                  </div>
-                  <div className="activity-summary-row">
-                    <dt>Expected work</dt>
-                    <dd>{selected.expectedEffort ?? "n/a"}</dd>
-                  </div>
-                  <div className="activity-summary-row">
-                    <dt>Work</dt>
-                    <dd>{selected.realEffort ?? "n/a"}</dd>
-                  </div>
-                  <div className="activity-summary-row">
-                    <dt>Scheduled</dt>
-                    <dd>{selectedDetails.scheduled ? "yes" : "no"}</dd>
-                  </div>
-                  <div className="activity-summary-row">
-                    <dt>Start date</dt>
-                    <dd>{selected.startDate || "n/a"}</dd>
-                  </div>
-                  <div className="activity-summary-row">
-                    <dt>Latest by</dt>
-                    <dd>{selected.bestBefore || "n/a"}</dd>
-                  </div>
-                </dl>
-              </div>
-            ) : (
-              <TaskListSurface
-                graph={graph}
-                nodesById={nodesById}
-                selectedId={selectedId}
-                onSelectNode={setSelectedId}
-                onCreateRoot={() => {
-                  setIsModeMenuExpanded(false);
-                  openSheet({ type: "create" }, defaultForm(null));
-                }}
-                onCreateChild={openCreateChildSheet}
-              />
-            )}
+          <div className="notes-overlay-form task-list-sidepanel-form">
+            <TaskListSurface
+              graph={graph}
+              nodesById={nodesById}
+              selectedId={selectedId}
+              onSelectNode={setSelectedId}
+              onCreateRoot={() => {
+                setIsModeMenuExpanded(false);
+                openSheet({ type: "create" }, defaultForm(null));
+              }}
+              onCreateChild={openCreateChildSheet}
+            />
           </div>
         </aside>
       ) : null}
@@ -3519,50 +3741,20 @@ export default function App() {
         </div>
       )}
 
-      {!displayedSurfaceMode && selected && selectedDetails && selected.kind !== "note" && (
+      {showActivityInspector && (
         <aside className="notes-overlay activity-overlay" onClick={(event) => event.stopPropagation()}>
           <div className="notes-overlay-form activity-overlay-form">
-            <div className="activity-overlay-body">
-              <header className="activity-overlay-header">
-                <h2>{selected.title}</h2>
-              </header>
-              <dl className="activity-summary-list">
-                <div className="activity-summary-row">
-                  <dt>Level</dt>
-                  <dd>{selectedDetails.level}</dd>
-                </div>
-                <div className="activity-summary-row">
-                  <dt>Completion in</dt>
-                  <dd>
-                    {selectedDetails.parentCount} {selectedDetails.parentCount === 1 ? "parent" : "parents"} and{" "}
-                    {formatHours(selectedDetails.chainExpectedTime)}
-                  </dd>
-                </div>
-                <div className="activity-summary-row">
-                  <dt>Expected work</dt>
-                  <dd>{selected.expectedEffort ?? "n/a"}</dd>
-                </div>
-                <div className="activity-summary-row">
-                  <dt>Work</dt>
-                  <dd>{selected.realEffort ?? "n/a"}</dd>
-                </div>
-                <div className="activity-summary-row">
-                  <dt>Scheduled</dt>
-                  <dd>{selectedDetails.scheduled ? "yes" : "no"}</dd>
-                </div>
-                <div className="activity-summary-row">
-                  <dt>Start date</dt>
-                  <dd>{selected.startDate || "n/a"}</dd>
-                </div>
-                <div className="activity-summary-row">
-                  <dt>Latest by</dt>
-                  <dd>{selected.bestBefore || "n/a"}</dd>
-                </div>
-              </dl>
-            </div>
+            <ActivitySummaryBody node={selected} details={selectedDetails} />
           </div>
         </aside>
       )}
+
+      {focusNode ? (
+        <div className="work-focus-hud" onClick={(event) => event.stopPropagation()}>
+          <p className="eyebrow">FOCUS</p>
+          <strong className="work-focus-timer">{formatHours(getWorkingHours(focusNode, now))}</strong>
+        </div>
+      ) : null}
 
       {sheet && (
         <div className="sheet-backdrop" onPointerDown={closeSheet}>
