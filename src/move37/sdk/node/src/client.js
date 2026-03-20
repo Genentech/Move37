@@ -2,7 +2,7 @@ import packageJson from "../package.json" with { type: "json" };
 
 export class ApiError extends Error {
   constructor(status, body, message) {
-    super(message ?? `Move37 API request failed with status ${status}`);
+    super(message ?? deriveErrorMessage(status, body));
     this.name = "ApiError";
     this.status = status;
     this.body = body;
@@ -390,4 +390,19 @@ function summarize(value) {
     summary[key] = summarize(entry);
   }
   return summary;
+}
+
+function deriveErrorMessage(status, body) {
+  if (body && typeof body === "object") {
+    if (typeof body.detail === "string" && body.detail.trim()) {
+      return body.detail;
+    }
+    if (typeof body.message === "string" && body.message.trim()) {
+      return body.message;
+    }
+    if (typeof body.error === "string" && body.error.trim()) {
+      return body.error;
+    }
+  }
+  return `Move37 API request failed with status ${status}`;
 }
