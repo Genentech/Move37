@@ -182,6 +182,7 @@
 }
 
 .sphere-area {
+  position: relative;
   margin: 0;
   border-radius: 0;
   border: 0;
@@ -345,6 +346,17 @@
   opacity: 0.8;
 }
 
+.linear-guides-backdrop {
+  transition: opacity 260ms ease;
+}
+
+.linear-guide-line {
+  fill: none;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  opacity: 0.58;
+}
+
 .control-dock {
   position: static;
   display: flex;
@@ -446,6 +458,45 @@
   box-shadow: 0 0 24px #6cd7ff38;
 }
 
+.dock-button.focus-play {
+  border-color: #82f5c25a;
+  background: linear-gradient(180deg, #10302bbf 0%, #0d2824dd 100%);
+  color: #bdfbe3;
+  box-shadow: 0 0 18px #62f0b01f;
+}
+
+.dock-button.focus-play:hover {
+  border-color: #8effd86f;
+  background: linear-gradient(180deg, #133a33e2 0%, #11342de8 100%);
+  box-shadow: 0 0 20px #62f0b033;
+}
+
+.dock-button.focus-pause {
+  border-color: #ffd98a52;
+  background: linear-gradient(180deg, #312610bf 0%, #291f0ddd 100%);
+  color: #ffe2a6;
+  box-shadow: 0 0 18px #ffd6671d;
+}
+
+.dock-button.focus-pause:hover {
+  border-color: #ffe39a74;
+  background: linear-gradient(180deg, #3a2d13e2 0%, #32260fe8 100%);
+  box-shadow: 0 0 20px #ffd66730;
+}
+
+.dock-button.focus-stop {
+  border-color: #ff9fb452;
+  background: linear-gradient(180deg, #30131abf 0%, #260f14dd 100%);
+  color: #ffc2cd;
+  box-shadow: 0 0 18px #ff829a1f;
+}
+
+.dock-button.focus-stop:hover {
+  border-color: #ffb0c072;
+  background: linear-gradient(180deg, #38161ee2 0%, #301218e8 100%);
+  box-shadow: 0 0 20px #ff829a30;
+}
+
 .dock-button svg {
   width: 1rem;
   height: 1rem;
@@ -503,7 +554,7 @@
 
 .sphere-shell {
   vector-effect: non-scaling-stroke;
-  transition: opacity 170ms ease;
+  transition: opacity 260ms ease;
 }
 
 .sphere-shell.shell-entering {
@@ -551,6 +602,11 @@
 }
 
 .edge-ribbon.ambient-tree {
+  opacity: 0;
+  animation: ambientTreeReveal 3000ms ease-in-out 1 both;
+}
+
+.edge-line.ambient-tree {
   opacity: 0;
   animation: ambientTreeReveal 3000ms ease-in-out 1 both;
 }
@@ -603,6 +659,65 @@
 
 .edge-ribbon.edge-moving {
   transition: opacity 220ms ease, filter 220ms ease;
+}
+
+.linear-level-controls {
+  position: absolute;
+  inset: 4.7rem 0 1.2rem;
+  pointer-events: none;
+}
+
+.linear-level-control {
+  position: absolute;
+  top: 0;
+  display: grid;
+  justify-items: center;
+  gap: 0.38rem;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.linear-level-badge {
+  min-width: 3.6rem;
+  padding: 0.34rem 0.58rem;
+  border: 1px solid #8cb4ff24;
+  border-radius: 999px;
+  background: #0b172cd8;
+  color: #dbeeff;
+  text-align: center;
+  font: 700 0.58rem/1 "IBM Plex Mono", "Courier New", monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-shadow: 0 0 20px #00091a26;
+}
+
+.linear-level-collapse {
+  width: 1.8rem;
+  height: 1.8rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid #8cb4ff2e;
+  border-radius: 999px;
+  background: #102244e0;
+  color: #d9ebff;
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 220ms ease;
+}
+
+.linear-level-collapse:hover {
+  transform: translateY(-1px);
+  border-color: #9fe8ff66;
+  background: #163866f2;
+  box-shadow: 0 0 18px #6cd7ff2b;
+}
+
+.linear-level-collapse svg {
+  width: 0.82rem;
+  height: 0.82rem;
 }
 
 .task-list-grid {
@@ -932,12 +1047,28 @@
 }
 
 .focus-node-overlay .focus-node {
-  filter: drop-shadow(0 0 14px #9ff4ff2a);
+  filter: drop-shadow(0 0 28px #bdfbff22);
+  animation: focusPulse 5000ms ease-in-out infinite;
+}
+
+.focus-node-overlay .node-halo.focus-node {
+  opacity: 0.98;
+  filter: blur(34px) drop-shadow(0 0 72px #c9fcff18);
+  animation-duration: 5000ms;
+}
+
+.focus-node-overlay .node-soft-edge.focus-node {
+  opacity: 0.22;
+  filter: blur(14px);
+}
+
+.focus-node-overlay .node-core.focus-node {
+  filter: drop-shadow(0 0 30px #ffe58a45);
 }
 
 .focus-node-overlay .node-label.focus-node {
   opacity: 0.96;
-  font-size: 0.56rem;
+  font-size: 0.6rem;
 }
 
 @keyframes nodeFadeIn {
@@ -946,6 +1077,29 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+@keyframes focusPulse {
+  0% {
+    opacity: 0.48;
+    filter: drop-shadow(0 0 18px #b8fbff10);
+  }
+  32% {
+    opacity: 0.72;
+    filter: drop-shadow(0 0 28px #c4fcff18);
+  }
+  54% {
+    opacity: 1;
+    filter: drop-shadow(0 0 52px #e3fdff26);
+  }
+  72% {
+    opacity: 0.82;
+    filter: drop-shadow(0 0 36px #d1fcff1c);
+  }
+  100% {
+    opacity: 0.48;
+    filter: drop-shadow(0 0 18px #b8fbff10);
   }
 }
 
@@ -1517,20 +1671,45 @@ button.chip {
 
 .work-focus-hud {
   position: fixed;
-  left: 50%;
-  top: calc(50% + 4.6rem);
-  transform: translateX(-50%);
+  left: calc(50% + 3.8rem);
+  top: calc(50% + 4.2rem);
   z-index: 15;
   display: grid;
-  justify-items: center;
-  gap: 0.5rem;
+  justify-items: start;
+  gap: 0.28rem;
   pointer-events: auto;
+}
+
+.work-focus-title {
+  margin: 0;
+  color: #eef7ff;
+  font: 700 1rem/1.15 "Sora", "Avenir Next", sans-serif;
+  text-shadow: 0 0 18px #a6ecff14;
+}
+
+.work-focus-summary {
+  margin: 0 0 0.18rem;
+  max-width: 17rem;
+  color: #a8c1df;
+  font: 500 0.74rem/1.4 "IBM Plex Sans", "Avenir Next", sans-serif;
+}
+
+.work-focus-label {
+  opacity: 0.88;
 }
 
 .work-focus-timer {
   color: #f3fbff;
-  font: 700 1.5rem/1 "Sora", "Avenir Next", sans-serif;
+  font: 700 2rem/1 "Sora", "Avenir Next", sans-serif;
+  letter-spacing: 0.04em;
   text-shadow: 0 0 20px #9ceaff18;
+}
+
+.work-focus-total {
+  color: #a9c4e4;
+  font: 700 0.68rem/1.1 "IBM Plex Mono", "Courier New", monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .surface-actions .ghost-button.active {

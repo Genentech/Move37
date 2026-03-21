@@ -13,7 +13,6 @@ import {
   rotateY,
   wouldCreateCycle,
 } from "./graph";
-import { TaskListSurface } from "./surfaces";
 
 const TOPBAR_MESSAGES = [
   "human operating system for the AI age",
@@ -24,6 +23,10 @@ const SEARCH_PLACEHOLDER = "search:activity";
 const EMPTY_GRAPH = { nodes: [], dependencies: [], schedules: [] };
 const DEFAULT_VIEWPORT_STATE = getDefaultViewport({ width: 1200, height: 760 });
 const SURFACE_TRANSITION_MS = 160;
+const LINEAR_TITLE_COLLATOR = new Intl.Collator("en", {
+  numeric: true,
+  sensitivity: "base",
+});
 
 function getLevelNoise(level, sessionSeed) {
   const base = Math.sin(sessionSeed * 97.13 + level * 53.71) * 43758.5453;
@@ -77,6 +80,40 @@ function getLevelVisualStyle(level, maxLevel, sessionSeed = 0) {
 
 function getNodeRenderRadius(node) {
   return 3.1 + Math.max(0, node.level) * 1.25 + node.depth * 0.9;
+}
+
+function compareLinearNodes(left, right) {
+  const leftStart = String(left?.startDate || "").trim();
+  const rightStart = String(right?.startDate || "").trim();
+  if (leftStart || rightStart) {
+    if (!leftStart) {
+      return 1;
+    }
+    if (!rightStart) {
+      return -1;
+    }
+    const dateCompare = leftStart.localeCompare(rightStart);
+    if (dateCompare !== 0) {
+      return dateCompare;
+    }
+  }
+
+  const leftDue = String(left?.bestBefore || "").trim();
+  const rightDue = String(right?.bestBefore || "").trim();
+  if (leftDue || rightDue) {
+    if (!leftDue) {
+      return 1;
+    }
+    if (!rightDue) {
+      return -1;
+    }
+    const dueCompare = leftDue.localeCompare(rightDue);
+    if (dueCompare !== 0) {
+      return dueCompare;
+    }
+  }
+
+  return LINEAR_TITLE_COLLATOR.compare(left?.title || "", right?.title || "");
 }
 
 function interpolateProjectedGraphs(fromProjected, toProjected, nodes, progress) {
@@ -136,9 +173,62 @@ function buildPinchedEdgePath(from, to, fromWidth, toWidth, midWidth) {
   return `M ${fromLeftX} ${fromLeftY} L ${midLeftX} ${midLeftY} L ${toLeftX} ${toLeftY} L ${toRightX} ${toRightY} L ${midRightX} ${midRightY} L ${fromRightX} ${fromRightY} Z`;
 }
 
+function getLinearFrame(centerX, centerY, radius) {
+  return {
+    left: centerX - radius * 1.08,
+    right: centerX + radius * 1.08,
+    top: centerY - radius * 0.86,
+    bottom: centerY + radius * 0.86,
+  };
+}
+
+function getLinearColumnX(level, maxLevel, centerX, radius) {
+  const frame = getLinearFrame(centerX, 0, radius);
+  const span = frame.right - frame.left;
+  const steps = Math.max(maxLevel, 1);
+  return frame.left + ((maxLevel - level) / steps) * span;
+}
+
+function projectLinearPoint({
+  level,
+  maxLevel,
+  linearOrder,
+  linearCount,
+  centerX,
+  centerY,
+  radius,
+}) {
+  const frame = getLinearFrame(centerX, centerY, radius);
+  const steps = Math.max(maxLevel, 1);
+  const x = frame.left + ((maxLevel - level) / steps) * (frame.right - frame.left);
+  const y =
+    linearCount <= 1
+      ? centerY
+      : frame.top + (linearOrder / Math.max(linearCount - 1, 1)) * (frame.bottom - frame.top);
+  return {
+    x,
+    y,
+    z: level * 0.0008,
+    depth: 1,
+  };
+}
+
+function getModeMorphSequence(fromMode, toMode) {
+  if (fromMode === toMode) {
+    return [];
+  }
+  if (fromMode === "3d" && toMode === "linear") {
+    return ["2d", "linear"];
+  }
+  if (fromMode === "linear" && toMode === "3d") {
+    return ["2d", "3d"];
+  }
+  return [toMode];
+}
+
 function buildAmbientTreeFlow(graph, layout) {
   if (!graph.nodes.length) {
-    return { dependencyEdgeIds: new Set() };
+    return { dependencyEdgeIds: new Set(), scheduleEdgeIds: new Set() };
   }
 
   const maxLevel = Math.max(0, ...graph.nodes.map((node) => layout.finalLevels.get(node.id) || 0));
@@ -148,12 +238,13 @@ function buildAmbientTreeFlow(graph, layout) {
   const outerPool = outerCandidates.length ? outerCandidates : graph.nodes;
   const outerNode = outerPool[Math.floor(Math.random() * outerPool.length)] || null;
   if (!outerNode) {
-    return { dependencyEdgeIds: new Set() };
+    return { dependencyEdgeIds: new Set(), scheduleEdgeIds: new Set() };
   }
 
   const ancestorIds = collectAncestors(outerNode.id, layout.parentMap);
   const nodeIds = new Set([outerNode.id, ...ancestorIds]);
   const dependencyEdgeIds = new Set();
+  const scheduleEdgeIds = new Set();
 
   graph.dependencies.forEach((edge) => {
     if (nodeIds.has(edge.parentId) && nodeIds.has(edge.childId)) {
@@ -161,8 +252,15 @@ function buildAmbientTreeFlow(graph, layout) {
     }
   });
 
+  graph.schedules.forEach((edge) => {
+    if (nodeIds.has(edge.earlierId) && nodeIds.has(edge.laterId)) {
+      scheduleEdgeIds.add(getScheduleEdgeId(edge));
+    }
+  });
+
   return {
     dependencyEdgeIds,
+    scheduleEdgeIds,
   };
 }
 
@@ -368,6 +466,16 @@ function buildClockwiseArcPath(from, to, options) {
     return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
   }
 
+  if (options.viewMode === "3d") {
+    return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+  }
+
+  if (options.viewMode === "linear") {
+    const bend = clamp(Math.abs(to.y - from.y) * 0.22 + 32, 28, 96);
+    const controlX = from.x + bend;
+    return `M ${from.x} ${from.y} C ${controlX} ${from.y}, ${controlX} ${to.y}, ${to.x} ${to.y}`;
+  }
+
   const startAngle = Math.atan2(from.y - options.centerY, from.x - options.centerX);
   let delta = Math.atan2(to.y - options.centerY, to.x - options.centerX) - startAngle;
   while (delta <= 0) {
@@ -376,24 +484,8 @@ function buildClockwiseArcPath(from, to, options) {
   const fromDistance = Math.hypot(from.x - options.centerX, from.y - options.centerY);
   const toDistance = Math.hypot(to.x - options.centerX, to.y - options.centerY);
   const averageRadius = (fromDistance + toDistance) / 2;
-  const steps = Math.max(12, Math.ceil(delta / (Math.PI / 20)));
-  const outwardBend = Math.min(18, Math.max(5, averageRadius * 0.04));
-  let path = `M ${from.x} ${from.y}`;
-
-  for (let index = 1; index < steps; index += 1) {
-    const t = index / steps;
-    const angle = startAngle + delta * t;
-    const radius = fromDistance + (toDistance - fromDistance) * t + Math.sin(Math.PI * t) * outwardBend;
-    const point = {
-      x: options.centerX + Math.cos(angle) * radius,
-      y: options.centerY + Math.sin(angle) * radius,
-    };
-    path += ` L ${point.x} ${point.y}`;
-  }
-
-  path += ` L ${to.x} ${to.y}`;
-
-  return path;
+  const largeArcFlag = delta > Math.PI ? 1 : 0;
+  return `M ${from.x} ${from.y} A ${averageRadius} ${averageRadius} 0 ${largeArcFlag} 1 ${to.x} ${to.y}`;
 }
 
 function GlobeIcon() {
@@ -421,15 +513,17 @@ function RingsIcon() {
   );
 }
 
-function ListIcon() {
+function LinearIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M8 7h10" className="icon-map-line" />
-      <path d="M8 12h10" className="icon-map-line" />
-      <path d="M8 17h10" className="icon-map-line" />
-      <circle cx="5.2" cy="7" r="1.1" className="icon-globe-outline" />
-      <circle cx="5.2" cy="12" r="1.1" className="icon-globe-outline" />
-      <circle cx="5.2" cy="17" r="1.1" className="icon-globe-outline" />
+      <path d="M5.4 5v14" className="icon-map-line" />
+      <path d="M10.1 5v14" className="icon-map-line" />
+      <path d="M14.8 5v14" className="icon-map-line" />
+      <path d="M19.5 5v14" className="icon-map-line" />
+      <circle cx="5.4" cy="8.2" r="1.25" className="icon-globe-outline" />
+      <circle cx="10.1" cy="12" r="1.25" className="icon-globe-outline" />
+      <circle cx="14.8" cy="15.6" r="1.25" className="icon-globe-outline" />
+      <circle cx="19.5" cy="9.8" r="1.25" className="icon-globe-outline" />
     </svg>
   );
 }
@@ -522,15 +616,6 @@ function SearchIcon() {
   );
 }
 
-function BackIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M14.8 6.2L8.7 12l6.1 5.8" className="icon-map-line" />
-      <path d="M9.4 12h8.4" className="icon-map-line" />
-    </svg>
-  );
-}
-
 function ZoomResetIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -542,6 +627,24 @@ function ZoomResetIcon() {
       <path d="M12 12V7.8" className="icon-map-line" />
       <path d="M9.2 14.8l2.8-2.8l2.8 2.8" className="icon-map-line" />
       <path d="M12 12v4.2" className="icon-map-line" />
+    </svg>
+  );
+}
+
+function ExpandLevelsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.4 16.8L12 11.2l5.6 5.6" className="icon-map-line" />
+      <path d="M6.4 12.2L12 6.6l5.6 5.6" className="icon-map-line" />
+    </svg>
+  );
+}
+
+function CollapseLevelsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.4 7.2L12 12.8l5.6-5.6" className="icon-map-line" />
+      <path d="M6.4 11.8L12 17.4l5.6-5.6" className="icon-map-line" />
     </svg>
   );
 }
@@ -678,6 +781,32 @@ function getWorkingHours(node, now) {
   }
   const elapsedMs = Math.max(0, now - new Date(node.workStartedAt).getTime());
   return base + elapsedMs / 1000 / 60 / 60;
+}
+
+function getFocusSessionMs(node, now) {
+  if (!node?.workStartedAt) {
+    return 0;
+  }
+  return Math.max(0, now - new Date(node.workStartedAt).getTime());
+}
+
+function formatFocusClock(durationMs) {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
+}
+
+function getFocusSummary(node) {
+  const raw = `${node?.notes || ""}`.trim().replace(/\s+/g, " ");
+  if (!raw) {
+    return "Focused task in progress.";
+  }
+  if (raw.length <= 88) {
+    return raw;
+  }
+  return `${raw.slice(0, 85).trimEnd()}...`;
 }
 
 function buildSelectedDetails(node, layout, graph, now) {
@@ -855,6 +984,7 @@ function getPhaseDuration(phase) {
 
 function buildNodeLayoutMap(graph, layout, rotation2D) {
   const nodeOrder = new Map(graph.nodes.map((node, index) => [node.id, index]));
+  const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
   const grouped = new Map();
   graph.nodes.forEach((node) => {
     const level = layout.finalLevels.get(node.id) || 0;
@@ -979,18 +1109,51 @@ function buildNodeLayoutMap(graph, layout, rotation2D) {
               angle,
               point3d,
               scheduleIndex: scheduledSet.has(id) ? scheduledIds.indexOf(id) : null,
+              linearOrder: 0,
+              linearCount: 1,
             });
           });
         });
       });
 
+  [...grouped.entries()].forEach(([, ids]) => {
+    const orderedIds = [...ids].sort((left, right) => {
+      const compared = compareLinearNodes(nodeById.get(left), nodeById.get(right));
+      if (compared !== 0) {
+        return compared;
+      }
+      return nodeOrder.get(left) - nodeOrder.get(right);
+    });
+    orderedIds.forEach((id, linearOrder) => {
+      const current = byId.get(id);
+      if (!current) {
+        return;
+      }
+      byId.set(id, {
+        ...current,
+        linearOrder,
+        linearCount: orderedIds.length,
+      });
+    });
+  });
+
   return byId;
 }
 
 function buildProjectedGraph(graph, nodeLayout, options) {
-  const { size, zoom, viewMode, rotationX, rotationY, panOffset = { x: 0, y: 0 } } = options;
-  const centerX = size.width / 2 + panOffset.x;
-  const centerY = size.height / 2 + panOffset.y;
+  const {
+    size,
+    zoom,
+    viewMode,
+    maxLevel = 0,
+    rotationX,
+    rotationY,
+    panOffset = { x: 0, y: 0 },
+    focusNodeId = null,
+    focusTarget = null,
+  } = options;
+  let centerX = size.width / 2 + panOffset.x;
+  let centerY = size.height / 2 + panOffset.y;
   const radius = Math.min(size.width, size.height) * 0.39 * zoom;
   const byId = {};
   const ordered = graph.nodes.map((node) => {
@@ -1001,9 +1164,21 @@ function buildProjectedGraph(graph, nodeLayout, options) {
       radialRatio: 0,
       angle: -Math.PI / 2,
       point3d: { x: 0, y: 0, z: 0 },
+      linearOrder: 0,
+      linearCount: 1,
     };
     const point =
-      viewMode === "2d"
+      viewMode === "linear"
+        ? projectLinearPoint({
+            level: spatial.level,
+            maxLevel,
+            linearOrder: spatial.linearOrder,
+            linearCount: spatial.linearCount,
+            centerX,
+            centerY,
+            radius,
+          })
+        : viewMode === "2d"
         ? projectLevelPoint({
             angle: spatial.angle,
             radialRatio: spatial.radialRatio,
@@ -1031,6 +1206,8 @@ function buildProjectedGraph(graph, nodeLayout, options) {
       angle: spatial.angle,
       radialRatio: spatial.radialRatio,
       point3d: spatial.point3d,
+      linearOrder: spatial.linearOrder,
+      linearCount: spatial.linearCount,
       x: point.x,
       y: point.y,
       z: point.z,
@@ -1039,6 +1216,18 @@ function buildProjectedGraph(graph, nodeLayout, options) {
     byId[node.id] = projectedNode;
     return projectedNode;
   });
+
+  if (focusNodeId && focusTarget && byId[focusNodeId]) {
+    const offsetX = focusTarget.x - byId[focusNodeId].x;
+    const offsetY = focusTarget.y - byId[focusNodeId].y;
+    centerX += offsetX;
+    centerY += offsetY;
+    ordered.forEach((node) => {
+      node.x += offsetX;
+      node.y += offsetY;
+      byId[node.id] = node;
+    });
+  }
 
   ordered.sort((left, right) => left.z - right.z);
   return { ordered, byId, centerX, centerY, radius };
@@ -1084,6 +1273,7 @@ export default function App() {
   const dragRef = useRef({ active: false, mode: null, x: 0, y: 0, angle: 0 });
   const transitionTimersRef = useRef([]);
   const modeMorphFrameRef = useRef(0);
+  const modeMorphQueueRef = useRef([]);
   const viewportTweenFrameRef = useRef(0);
   const surfaceCloseTimerRef = useRef(0);
   const pendingSurfaceActionRef = useRef(null);
@@ -1128,6 +1318,7 @@ export default function App() {
   const [rotationX, setRotationX] = useState(0.52);
   const [rotationY, setRotationY] = useState(0);
   const [rotation2D, setRotation2D] = useState(0);
+  const [minVisibleLevel, setMinVisibleLevel] = useState(0);
   const [zoom, setZoom] = useState(DEFAULT_VIEWPORT_STATE.zoom);
   const [panOffset, setPanOffset] = useState(DEFAULT_VIEWPORT_STATE.panOffset);
   const [isDragging, setIsDragging] = useState(false);
@@ -1155,6 +1346,7 @@ export default function App() {
   const [now, setNow] = useState(() => Date.now());
   const [ambientFlow, setAmbientFlow] = useState({
     dependencyEdgeIds: new Set(),
+    scheduleEdgeIds: new Set(),
   });
   const [workingId, setWorkingId] = useState(null);
   const [focusedWorkId, setFocusedWorkId] = useState(null);
@@ -1163,7 +1355,6 @@ export default function App() {
   const displayViewMode = modeMorph ? modeMorph.to : viewMode;
   const defaultViewport = useMemo(() => getDefaultViewport(size), [size]);
   const displayedSurfaceMode = surfaceClosingMode || (surfaceMode !== "graph" ? surfaceMode : null);
-  const surfaceOverlayVisible = surfaceMode !== "graph" && !surfaceClosingMode;
   const graphSuspended = displayedSurfaceMode != null;
   const levelSeed = levelSeedRef.current;
 
@@ -1326,7 +1517,13 @@ export default function App() {
       setModeMorph({ from, to, progress });
       if (progress >= 1) {
         setViewMode(to);
-        setModeMorph(null);
+        const [nextMode, ...restQueue] = modeMorphQueueRef.current;
+        modeMorphQueueRef.current = restQueue;
+        if (nextMode) {
+          setModeMorph({ from: to, to: nextMode, progress: 0 });
+        } else {
+          setModeMorph(null);
+        }
         modeMorphFrameRef.current = 0;
         return;
       }
@@ -1450,8 +1647,12 @@ export default function App() {
   const layout = useMemo(() => computeGraphLayout(graph), [graph]);
 
   useEffect(() => {
+    setMinVisibleLevel((current) => Math.min(Math.max(current, 0), layout.maxLevel));
+  }, [layout.maxLevel]);
+
+  useEffect(() => {
     if (graphSuspended || selectedId || isTransitioning || graph.nodes.length === 0) {
-      setAmbientFlow({ dependencyEdgeIds: new Set() });
+      setAmbientFlow({ dependencyEdgeIds: new Set(), scheduleEdgeIds: new Set() });
       return undefined;
     }
 
@@ -1472,8 +1673,27 @@ export default function App() {
   const nodeLayout = useMemo(() => buildNodeLayoutMap(graph, layout, rotation2D), [graph, layout, rotation2D]);
 
   const focusNodeId = focusedWorkId || workingId;
-  const workingNode = workingId ? nodesById.get(workingId) || null : null;
   const focusNode = focusNodeId ? nodesById.get(focusNodeId) || null : null;
+
+  useEffect(() => {
+    if (!focusNodeId) {
+      return;
+    }
+    const level = layout.finalLevels.get(focusNodeId);
+    if (level == null || level >= minVisibleLevel) {
+      return;
+    }
+    setMinVisibleLevel(level);
+  }, [focusNodeId, layout.finalLevels, minVisibleLevel]);
+  useEffect(() => {
+    if (!selectedId || focusNodeId) {
+      return;
+    }
+    const level = layout.finalLevels.get(selectedId);
+    if (level != null && level < minVisibleLevel) {
+      setSelectedId(null);
+    }
+  }, [focusNodeId, layout.finalLevels, minVisibleLevel, selectedId]);
   const workingPoint = useMemo(() => {
     if (!focusNodeId || !focusNode) {
       return null;
@@ -1493,6 +1713,18 @@ export default function App() {
   const effectiveRotationY =
     focusNodeId && focusRotation ? focusRotation.rotationY + autoRotation : rotationY + autoRotation;
   const effectivePanOffset = focusNodeId ? { x: 0, y: 0 } : panOffset;
+  const focusTarget = useMemo(() => {
+    if (!focusNodeId) {
+      return null;
+    }
+    const dockRect = dockRef.current?.getBoundingClientRect();
+    const dockLeft = dockRect?.left ?? size.width * 0.47;
+    const anchorX = Math.max(size.width * 0.18, dockLeft - 124);
+    return {
+      x: anchorX,
+      y: size.height * 0.58,
+    };
+  }, [focusNodeId, size.height, size.width]);
 
   const projected = useMemo(
     () =>
@@ -1500,11 +1732,14 @@ export default function App() {
         size,
         zoom,
         viewMode,
+        maxLevel: layout.maxLevel,
         rotationX: effectiveRotationX,
         rotationY: effectiveRotationY,
         panOffset: effectivePanOffset,
+        focusNodeId,
+        focusTarget,
       }),
-    [effectivePanOffset, effectiveRotationX, effectiveRotationY, graph, nodeLayout, size, viewMode, zoom],
+    [effectivePanOffset, effectiveRotationX, effectiveRotationY, focusNodeId, focusTarget, graph, layout.maxLevel, nodeLayout, size, viewMode, zoom],
   );
   const projected2D = useMemo(
     () =>
@@ -1512,11 +1747,14 @@ export default function App() {
         size,
         zoom,
         viewMode: "2d",
+        maxLevel: layout.maxLevel,
         rotationX: effectiveRotationX,
         rotationY: effectiveRotationY,
         panOffset: effectivePanOffset,
+        focusNodeId,
+        focusTarget,
       }),
-    [effectivePanOffset, effectiveRotationX, effectiveRotationY, graph, nodeLayout, size, zoom],
+    [effectivePanOffset, effectiveRotationX, effectiveRotationY, focusNodeId, focusTarget, graph, layout.maxLevel, nodeLayout, size, zoom],
   );
   const projected3D = useMemo(
     () =>
@@ -1524,11 +1762,29 @@ export default function App() {
         size,
         zoom,
         viewMode: "3d",
+        maxLevel: layout.maxLevel,
         rotationX: effectiveRotationX,
         rotationY: effectiveRotationY,
         panOffset: effectivePanOffset,
+        focusNodeId,
+        focusTarget,
       }),
-    [effectivePanOffset, effectiveRotationX, effectiveRotationY, graph, nodeLayout, size, zoom],
+    [effectivePanOffset, effectiveRotationX, effectiveRotationY, focusNodeId, focusTarget, graph, layout.maxLevel, nodeLayout, size, zoom],
+  );
+  const projectedLinear = useMemo(
+    () =>
+      buildProjectedGraph(graph, nodeLayout, {
+        size,
+        zoom,
+        viewMode: "linear",
+        maxLevel: layout.maxLevel,
+        rotationX: effectiveRotationX,
+        rotationY: effectiveRotationY,
+        panOffset: effectivePanOffset,
+        focusNodeId,
+        focusTarget,
+      }),
+    [effectivePanOffset, effectiveRotationX, effectiveRotationY, focusNodeId, focusTarget, graph, layout.maxLevel, nodeLayout, size, zoom],
   );
 
   const transitionFromNodeLayout = useMemo(
@@ -1548,15 +1804,20 @@ export default function App() {
             size,
             zoom,
             viewMode,
+            maxLevel: transition.fromLayout.maxLevel,
             rotationX: effectiveRotationX,
             rotationY: effectiveRotationY,
             panOffset: effectivePanOffset,
+            focusNodeId,
+            focusTarget,
           })
         : null,
     [
       effectivePanOffset,
       effectiveRotationX,
       effectiveRotationY,
+      focusNodeId,
+      focusTarget,
       size,
       transition,
       transitionFromNodeLayout,
@@ -1571,15 +1832,20 @@ export default function App() {
             size,
             zoom,
             viewMode,
+            maxLevel: transition.toLayout.maxLevel,
             rotationX: effectiveRotationX,
             rotationY: effectiveRotationY,
             panOffset: effectivePanOffset,
+            focusNodeId,
+            focusTarget,
           })
         : null,
     [
       effectivePanOffset,
       effectiveRotationX,
       effectiveRotationY,
+      focusNodeId,
+      focusTarget,
       size,
       transition,
       transitionToNodeLayout,
@@ -1787,24 +2053,63 @@ export default function App() {
     () => Math.max(0, ...renderState.levelShells.map((shell) => shell.level)),
     [renderState.levelShells],
   );
+  const visibleNodeState = useMemo(
+    () => renderState.nodes.filter((node) => (node.level ?? 0) >= minVisibleLevel),
+    [minVisibleLevel, renderState.nodes],
+  );
+  const visibleNodeStateById = useMemo(
+    () => new Map(visibleNodeState.map((node) => [node.id, node])),
+    [visibleNodeState],
+  );
+  const visibleLevelShells = useMemo(
+    () => renderState.levelShells.filter((shell) => shell.level >= minVisibleLevel),
+    [minVisibleLevel, renderState.levelShells],
+  );
+  const visibleDependencyEdges = useMemo(
+    () =>
+      renderState.dependencyEdges.filter(
+        (edge) => visibleNodeStateById.has(edge.parentId) && visibleNodeStateById.has(edge.childId),
+      ),
+    [renderState.dependencyEdges, visibleNodeStateById],
+  );
+  const visibleScheduleEdges = useMemo(
+    () =>
+      renderState.scheduleEdges.filter(
+        (edge) => visibleNodeStateById.has(edge.earlierId) && visibleNodeStateById.has(edge.laterId),
+      ),
+    [renderState.scheduleEdges, visibleNodeStateById],
+  );
+
+  function getProjectedForMode(mode) {
+    if (mode === "linear") {
+      return projectedLinear;
+    }
+    if (mode === "2d") {
+      return projected2D;
+    }
+    return projected3D;
+  }
+
   const displayProjected = useMemo(() => {
     if (transition || !modeMorph) {
       return renderState.projected;
     }
-    const fromProjected = modeMorph.from === "2d" ? projected2D : projected3D;
-    const toProjected = modeMorph.to === "2d" ? projected2D : projected3D;
-    return interpolateProjectedGraphs(fromProjected, toProjected, renderState.nodes, modeMorph.progress);
-  }, [modeMorph, projected2D, projected3D, renderState.nodes, renderState.projected, transition]);
+    const fromProjected = getProjectedForMode(modeMorph.from);
+    const toProjected = getProjectedForMode(modeMorph.to);
+    return interpolateProjectedGraphs(fromProjected, toProjected, visibleNodeState, modeMorph.progress);
+  }, [modeMorph, projected2D, projected3D, projectedLinear, renderState.projected, transition, visibleNodeState]);
   const displayNodes = useMemo(() => {
     if (!displayProjected?.ordered) {
-      return renderState.nodes;
+      return visibleNodeState;
     }
-    const nodeStateById = new Map(renderState.nodes.map((node) => [node.id, node]));
-    return displayProjected.ordered.map((projectedNode) => ({
-      ...nodeStateById.get(projectedNode.id),
-      ...projectedNode,
-    }));
-  }, [displayProjected, renderState.nodes]);
+    const nodeStateById = new Map(visibleNodeState.map((node) => [node.id, node]));
+    return displayProjected.ordered
+      .filter((projectedNode) => nodeStateById.has(projectedNode.id))
+      .map((projectedNode) => ({
+        ...nodeStateById.get(projectedNode.id),
+        ...projectedNode,
+      }));
+  }, [displayProjected, visibleNodeState]);
   const staticShellProjection = useMemo(
     () => ({
       centerX: size.width / 2 + effectivePanOffset.x,
@@ -1815,6 +2120,43 @@ export default function App() {
   );
   const sphereProjection = graphSuspended ? staticShellProjection : displayProjected;
   const showDynamicGraph = !graphSuspended;
+  const sphereShellWeight = useMemo(() => {
+    if (!modeMorph) {
+      return viewMode === "linear" ? 0 : 1;
+    }
+    if (modeMorph.from === "linear" && modeMorph.to === "2d") {
+      return modeMorph.progress;
+    }
+    if (modeMorph.from === "2d" && modeMorph.to === "linear") {
+      return 1 - modeMorph.progress;
+    }
+    return modeMorph.to === "linear" ? 0 : 1;
+  }, [modeMorph, viewMode]);
+  const linearGuideWeight = useMemo(() => {
+    if (!modeMorph) {
+      return viewMode === "linear" ? 1 : 0;
+    }
+    if (modeMorph.from === "linear" && modeMorph.to === "2d") {
+      return 1 - modeMorph.progress;
+    }
+    if (modeMorph.from === "2d" && modeMorph.to === "linear") {
+      return modeMorph.progress;
+    }
+    return modeMorph.to === "linear" ? 1 : 0;
+  }, [modeMorph, viewMode]);
+  const linearColumns = useMemo(() => {
+    const levels = [];
+    for (let level = layout.maxLevel; level >= minVisibleLevel; level -= 1) {
+      levels.push({
+        level,
+        x: getLinearColumnX(level, layout.maxLevel, projectedLinear.centerX, projectedLinear.radius),
+      });
+    }
+    return levels;
+  }, [layout.maxLevel, minVisibleLevel, projectedLinear.centerX, projectedLinear.radius]);
+  const canCollapseLevels = minVisibleLevel < layout.maxLevel;
+  const canExpandLevels = minVisibleLevel > 0;
+  const showLinearControls = displayViewMode === "linear" && !isMorphing;
 
   useEffect(() => {
     const active = graph.nodes.find((node) => node.workStartedAt);
@@ -1957,6 +2299,10 @@ export default function App() {
       : null;
     setSearchState(found ? "success" : "failure");
     if (found) {
+      const foundLevel = layout.finalLevels.get(found.id);
+      if (foundLevel != null) {
+        setMinVisibleLevel((current) => Math.min(current, foundLevel));
+      }
       setSelectedId(found.id);
     }
     setNodesVisible(true);
@@ -2048,6 +2394,17 @@ export default function App() {
       return;
     }
     const panDrag = event.ctrlKey || event.metaKey;
+    if (viewMode === "linear") {
+      dragRef.current = {
+        active: true,
+        mode: "pan",
+        x: event.clientX,
+        y: event.clientY,
+        angle: 0,
+      };
+      setIsDragging(true);
+      return;
+    }
     if (viewMode === "2d") {
       dragRef.current = {
         active: true,
@@ -2144,7 +2501,12 @@ export default function App() {
     if (nextMode === viewMode || isMorphing) {
       return;
     }
-    setModeMorph({ from: viewMode, to: nextMode, progress: 0 });
+    const [firstMode, ...restModes] = getModeMorphSequence(viewMode, nextMode);
+    if (!firstMode) {
+      return;
+    }
+    modeMorphQueueRef.current = restModes;
+    setModeMorph({ from: viewMode, to: firstMode, progress: 0 });
   }
 
   function switchViewMode(nextMode) {
@@ -2156,14 +2518,30 @@ export default function App() {
     performGraphModeSwitch(nextMode);
   }
 
-  function openListSurface() {
-    clearSurfaceCloseTimer();
-    pendingSurfaceActionRef.current = null;
-    setSurfaceClosingMode(null);
-    setSurfaceMode("list");
-    setSelectedId(null);
-    setContextMenu(null);
-    setIsModeMenuExpanded(false);
+  function collapseAllLevels() {
+    setMinVisibleLevel(layout.maxLevel);
+  }
+
+  function expandAllLevels() {
+    setMinVisibleLevel(0);
+  }
+
+  function collapseAtLevel(level) {
+    setMinVisibleLevel(Math.min(layout.maxLevel, Math.max(level + 1, 0)));
+  }
+
+  function maybeExpandNextLevel(nodeId) {
+    if (minVisibleLevel <= 0) {
+      return;
+    }
+    const nextLevel = minVisibleLevel - 1;
+    const descendants = collectDescendants(nodeId, layout.childMap);
+    const revealsNextLevel = [...descendants].some(
+      (descendantId) => (layout.finalLevels.get(descendantId) || 0) === nextLevel,
+    );
+    if (revealsNextLevel) {
+      setMinVisibleLevel(nextLevel);
+    }
   }
 
   function onWheel(event) {
@@ -2249,6 +2627,7 @@ export default function App() {
       }
       return;
     }
+    maybeExpandNextLevel(nodeId);
     setSelectedId((current) => (current === nodeId ? null : nodeId));
   }
 
@@ -2872,7 +3251,6 @@ export default function App() {
   }
 
   const hasActivitySelection = Boolean(selected && selectedDetails && selected.kind !== "note");
-  const isListMode = displayedSurfaceMode === "list";
   const showActivityInspector = hasActivitySelection && leftPanel !== "note-editor" && !focusNodeId;
   const focusProjectedNode = focusNodeId ? displayProjected.byId[focusNodeId] || null : null;
   const isZoomAdjusted = Math.abs(zoom - defaultViewport.zoom) > 0.001;
@@ -2916,32 +3294,10 @@ export default function App() {
               </button>
             </>
           ) : null}
-          {isListMode && hasActivitySelection ? (
-            <button
-              type="button"
-              className="dock-button"
-              onClick={() => setSelectedId(null)}
-              aria-label="Return to list"
-              title="Return to list"
-            >
-              <BackIcon />
-            </button>
-          ) : null}
-          {isListMode ? (
-            <button
-              type="button"
-              className="dock-button"
-              onClick={() => closeSurfaceOverlay()}
-              aria-label="Close activity list"
-              title="Close activity list"
-            >
-              <ExitIcon />
-            </button>
-          ) : null}
           {selected && selected.kind !== "note" && !focusNodeId ? (
             <button
               type="button"
-              className="dock-button"
+              className="dock-button focus-play"
               onClick={() => startWork(selected.id)}
               aria-label="Start activity"
               title="Start activity"
@@ -2952,7 +3308,7 @@ export default function App() {
           {focusNode ? (
             <button
               type="button"
-              className="dock-button"
+              className={`dock-button ${focusNode.workStartedAt ? "focus-pause" : "focus-play"}`}
               onClick={toggleFocusedWorkPlayback}
               aria-label={focusNode.workStartedAt ? "Pause activity" : "Resume activity"}
               title={focusNode.workStartedAt ? "Pause activity" : "Resume activity"}
@@ -2963,7 +3319,7 @@ export default function App() {
           {focusNode ? (
             <button
               type="button"
-              className="dock-button"
+              className="dock-button focus-stop"
               onClick={stopFocusedSession}
               aria-label="Stop focus"
               title="Stop focus"
@@ -3037,12 +3393,12 @@ export default function App() {
                 aria-label="Choose view mode"
                 title="Choose view mode"
               >
-                {surfaceMode === "list" ? <ListIcon /> : viewMode === "2d" ? <RingsIcon /> : <GlobeIcon />}
+                {viewMode === "linear" ? <LinearIcon /> : viewMode === "2d" ? <RingsIcon /> : <GlobeIcon />}
               </button>
               <div className="dock-mode-actions" aria-hidden={!isModeMenuExpanded}>
                 <button
                   type="button"
-                  className={`dock-subaction icon-only ${surfaceMode === "graph" && viewMode === "2d" ? "active" : ""}`}
+                  className={`dock-subaction icon-only ${viewMode === "2d" ? "active" : ""}`}
                   onClick={() => switchViewMode("2d")}
                   title="2D view"
                 >
@@ -3050,7 +3406,7 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  className={`dock-subaction icon-only ${surfaceMode === "graph" && viewMode === "3d" ? "active" : ""}`}
+                  className={`dock-subaction icon-only ${viewMode === "3d" ? "active" : ""}`}
                   onClick={() => switchViewMode("3d")}
                   title="3D view"
                 >
@@ -3058,14 +3414,34 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  className={`dock-subaction icon-only ${surfaceMode === "list" ? "active" : ""}`}
-                  onClick={openListSurface}
-                  title="List view"
+                  className={`dock-subaction icon-only ${viewMode === "linear" ? "active" : ""}`}
+                  onClick={() => switchViewMode("linear")}
+                  title="Linear view"
                 >
-                  <ListIcon />
+                  <LinearIcon />
                 </button>
               </div>
             </div>
+            <button
+              type="button"
+              className="dock-button"
+              onClick={expandAllLevels}
+              aria-label="Expand all levels"
+              title="Expand all levels"
+              disabled={!canExpandLevels}
+            >
+              <ExpandLevelsIcon />
+            </button>
+            <button
+              type="button"
+              className="dock-button"
+              onClick={collapseAllLevels}
+              aria-label="Collapse all levels"
+              title="Collapse all levels"
+              disabled={!canCollapseLevels}
+            >
+              <CollapseLevelsIcon />
+            </button>
             <button
               type="button"
               className={`dock-button ${leftPanel === "note-editor" ? "active" : ""}`}
@@ -3138,8 +3514,8 @@ export default function App() {
                 type="button"
                 className="dock-button"
                 onClick={recenterView}
-                aria-label="Recenter sphere"
-                title="Recenter sphere"
+                aria-label="Recenter view"
+                title="Recenter view"
               >
                 <CenterIcon />
               </button>
@@ -3270,7 +3646,7 @@ export default function App() {
               <path d="M1.6 1.2L10.2 6L1.6 10.8L4.1 6z" fill="context-stroke" />
             </marker>
             {showDynamicGraph
-              ? renderState.dependencyEdges.map((edge) => {
+              ? visibleDependencyEdges.map((edge) => {
                   const from = displayProjected.byId[edge.parentId];
                   const to = displayProjected.byId[edge.childId];
                   if (!from || !to) {
@@ -3304,6 +3680,7 @@ export default function App() {
             ry={Math.min(size.width, size.height) * 0.44 * zoom}
             className="sphere-glow"
             fill="url(#sphere-halo)"
+            style={{ opacity: sphereShellWeight }}
           />
           <ellipse
             cx={sphereProjection.centerX}
@@ -3312,6 +3689,7 @@ export default function App() {
             ry={Math.min(size.width, size.height) * 0.44 * zoom}
             className="sphere-glow-success"
             fill="url(#sphere-halo-success)"
+            style={{ opacity: sphereShellWeight }}
           />
           <ellipse
             cx={sphereProjection.centerX}
@@ -3320,10 +3698,40 @@ export default function App() {
             ry={Math.min(size.width, size.height) * 0.44 * zoom}
             className="sphere-glow-failure"
             fill="url(#sphere-halo-failure)"
+            style={{ opacity: sphereShellWeight }}
           />
+          {linearGuideWeight > 0 ? (
+            <g className="linear-guides-backdrop" aria-hidden="true" style={{ opacity: linearGuideWeight }}>
+              {linearColumns.map(({ level, x }) => {
+                const shell = visibleLevelShells.find((entry) => entry.level === level);
+                if (!shell) {
+                  return null;
+                }
+                return (
+                  <g key={`linear-guide-${level}`}>
+                    <line
+                      x1={x}
+                      y1={projectedLinear.centerY - projectedLinear.radius * 0.95}
+                      x2={x}
+                      y2={projectedLinear.centerY + projectedLinear.radius * 0.95}
+                      className="linear-guide-line"
+                      stroke={shell.glow}
+                      style={{
+                        filter: `drop-shadow(0 0 ${7 + level * 1.6}px ${shell.glow})`,
+                      }}
+                    />
+                  </g>
+                );
+              })}
+            </g>
+          ) : null}
           <g className="graph-viewport">
-            <g className={`sphere-shells ${focusNodeId ? "blurred" : ""}`} aria-hidden="true">
-              {[...renderState.levelShells].reverse().map((shell) => {
+            <g
+              className={`sphere-shells ${focusNodeId ? "blurred" : ""}`}
+              aria-hidden="true"
+              style={{ opacity: sphereShellWeight }}
+            >
+              {[...visibleLevelShells].reverse().map((shell) => {
                 const shellRadius = sphereProjection.radius * shell.ratio;
                 return (
                   <ellipse
@@ -3346,7 +3754,7 @@ export default function App() {
 
             {showDynamicGraph ? (
               <g className={`graph-layer ${nodesVisible ? "visible" : "hidden"} ${focusNodeId ? "blurred" : ""}`}>
-                {renderState.dependencyEdges.map((edge) => {
+                {visibleDependencyEdges.map((edge) => {
                   const from = displayProjected.byId[edge.parentId];
                   const to = displayProjected.byId[edge.childId];
                   if (!from || !to) {
@@ -3414,10 +3822,15 @@ export default function App() {
                   );
                 })}
 
-                {renderState.scheduleEdges.map((edge) => {
+                {displayViewMode !== "3d" ? visibleScheduleEdges.map((edge) => {
                   const from = displayProjected.byId[edge.earlierId];
                   const to = displayProjected.byId[edge.laterId];
                   if (!from || !to || from.level !== to.level) {
+                    return null;
+                  }
+                  const ambientSchedule =
+                    !selectedId && !isTransitioning && ambientFlow.scheduleEdgeIds.has(edge.id);
+                  if (!selectedId && !isTransitioning && !ambientSchedule) {
                     return null;
                   }
                   const active =
@@ -3451,6 +3864,7 @@ export default function App() {
                           "edge-line",
                           "schedule",
                           edge.transitionState ? `edge-${edge.transitionState}` : "",
+                          ambientSchedule ? "ambient-tree" : "",
                           active ? "active" : "",
                           dimmed ? "dimmed" : "",
                         ]
@@ -3473,7 +3887,7 @@ export default function App() {
                       />
                     </g>
                   );
-                })}
+                }) : null}
 
                 {displayNodes.map((node) => {
                   const selectedNode = node.id === selectedId;
@@ -3578,12 +3992,12 @@ export default function App() {
                   ...getLevelVisualStyle(focusProjectedNode.level, renderMaxLevel, levelSeed),
                 }}
               >
-                <circle r={getNodeRenderRadius(focusProjectedNode) * 2.55} className="node-halo active focus-node" />
-                <circle r={getNodeRenderRadius(focusProjectedNode) * 1.48} className="node-soft-edge focus-node" />
-                <circle r={getNodeRenderRadius(focusProjectedNode) * 1.36} className="node-core working focus-node" />
+                <circle r={getNodeRenderRadius(focusProjectedNode) * 4.4} className="node-halo active focus-node" />
+                <circle r={getNodeRenderRadius(focusProjectedNode) * 2.5} className="node-soft-edge focus-node" />
+                <circle r={getNodeRenderRadius(focusProjectedNode) * 1.92} className="node-core working focus-node" />
                 <text
-                  x={getNodeRenderRadius(focusProjectedNode) * 1.36 + 9}
-                  y={-getNodeRenderRadius(focusProjectedNode) * 1.36 - 4}
+                  x={getNodeRenderRadius(focusProjectedNode) * 1.92 + 10}
+                  y={-getNodeRenderRadius(focusProjectedNode) * 1.92 - 5}
                   className="node-label focus-node"
                 >
                   {focusProjectedNode.title}
@@ -3592,27 +4006,35 @@ export default function App() {
             ) : null}
           </g>
         </svg>
-      </section>
-      {displayedSurfaceMode === "list" ? (
-        <aside
-          className={`notes-overlay activity-overlay task-list-sidepanel ${surfaceOverlayVisible ? "visible" : "closing"}`}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div className="notes-overlay-form task-list-sidepanel-form">
-            <TaskListSurface
-              graph={graph}
-              nodesById={nodesById}
-              selectedId={selectedId}
-              onSelectNode={setSelectedId}
-              onCreateRoot={() => {
-                setIsModeMenuExpanded(false);
-                openSheet({ type: "create" }, defaultForm(null));
-              }}
-              onCreateChild={openCreateChildSheet}
-            />
+        {showLinearControls ? (
+          <div className="linear-level-controls" onPointerDown={(event) => event.stopPropagation()}>
+            {linearColumns.map(({ level, x }) => {
+              const isOuterLevel = level === layout.maxLevel;
+              return (
+                <div
+                  key={`linear-control-${level}`}
+                  className="linear-level-control"
+                  style={{ left: `${x}px` }}
+                >
+                  <span className="linear-level-badge">
+                    {isOuterLevel ? "Outer" : level === 0 ? "Root" : `L${level}`}
+                  </span>
+                  {!isOuterLevel ? (
+                    <button
+                      type="button"
+                      className="linear-level-collapse"
+                      onClick={() => collapseAtLevel(level)}
+                      title={`Collapse level ${level} and deeper levels`}
+                    >
+                      <CollapseLevelsIcon />
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
-        </aside>
-      ) : null}
+        ) : null}
+      </section>
 
       {!displayedSurfaceMode && contextMenu && (
         <div
@@ -3751,8 +4173,11 @@ export default function App() {
 
       {focusNode ? (
         <div className="work-focus-hud" onClick={(event) => event.stopPropagation()}>
-          <p className="eyebrow">FOCUS</p>
-          <strong className="work-focus-timer">{formatHours(getWorkingHours(focusNode, now))}</strong>
+          <p className="work-focus-title">{focusNode.title}</p>
+          <p className="work-focus-summary">{getFocusSummary(focusNode)}</p>
+          <p className="eyebrow work-focus-label">FOCUS</p>
+          <strong className="work-focus-timer">{formatFocusClock(getFocusSessionMs(focusNode, now))}</strong>
+          <span className="work-focus-total">{formatHours(getWorkingHours(focusNode, now))} total</span>
         </div>
       ) : null}
 
