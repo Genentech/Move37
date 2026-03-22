@@ -322,6 +322,105 @@ class CalendarReconcileOutput(BaseModel):
     clearedActivities: int
 
 
+class SchedulingRunParameters(BaseModel):
+    """Extensible scheduling-engine parameters."""
+
+    model_config = ConfigDict(extra="allow")
+
+
+class SchedulingReplanInput(BaseModel):
+    """Scheduling replan request payload."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: str = Field(pattern="^(dry_run|apply)$")
+    parameters: SchedulingRunParameters = Field(default_factory=SchedulingRunParameters)
+
+
+class SchedulingSummaryOutput(BaseModel):
+    """Scheduling run summary counts."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    movedTasks: int
+    conflicts: int
+    unscheduled: int
+    projectsAffected: int
+
+
+class SchedulingChangeOutput(BaseModel):
+    """One proposed task move or placement."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    activityId: str
+    title: str
+    previousStartsAt: str | None = None
+    proposedStartsAt: str
+    deltaMinutes: int | None = None
+    branchRootId: str | None = None
+
+
+class SchedulingConflictOutput(BaseModel):
+    """One scheduling conflict."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    activityId: str
+    title: str
+    code: str
+    message: str
+
+
+class SchedulingUnscheduledOutput(BaseModel):
+    """One task the scheduler could not place."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    activityId: str
+    title: str
+    code: str
+    message: str
+
+
+class SchedulingProjectImpactOutput(BaseModel):
+    """Completion-time impact for a project or dependency branch."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    branchRootId: str
+    projectTitle: str
+    previousCompletionAt: str | None = None
+    proposedCompletionAt: str | None = None
+    deltaMinutes: int | None = None
+
+
+class SchedulingRunMetadataOutput(BaseModel):
+    """Scheduling engine metadata returned with each run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    engine: str
+    engineVersion: str
+    runMode: str
+    computedAt: str
+    applied: bool
+
+
+class SchedulingReplanOutput(BaseModel):
+    """Full scheduling run result."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: str = Field(pattern="^(ok|infeasible)$")
+    summary: SchedulingSummaryOutput
+    changes: list[SchedulingChangeOutput]
+    conflicts: list[SchedulingConflictOutput]
+    unscheduled: list[SchedulingUnscheduledOutput]
+    projectImpacts: list[SchedulingProjectImpactOutput]
+    runMetadata: SchedulingRunMetadataOutput
+
+
 class ActivityDependencyOutput(BaseModel):
     """Dependency edge payload."""
 

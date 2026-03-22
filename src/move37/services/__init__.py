@@ -21,6 +21,7 @@ _EXPORTS = {
     "NoteService": "move37.services.notes",
     "OpenBankingClient": "move37.services.bank_account",
     "RevolutBankAccount": "move37.services.bank_account",
+    "SchedulingService": "move37.services.scheduling",
     "ServiceContainer": "move37.services.container",
 }
 

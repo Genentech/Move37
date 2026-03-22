@@ -140,6 +140,31 @@ class AppleCalendarSyncServiceTest(unittest.TestCase):
             )
             self.assertIsNone(link)
 
+    def test_sync_graph_removes_stale_linked_events(self) -> None:
+        self.test_sync_activity_creates_linked_all_day_event()
+
+        result = self.calendar_service.sync_graph(
+            self.subject,
+            snapshot={
+                "graphId": 1,
+                "version": 1,
+                "nodes": [
+                    {
+                        "id": "wake-early",
+                        "title": "Wake early",
+                        "notes": "",
+                        "startDate": "",
+                        "kind": "activity",
+                    }
+                ],
+                "dependencies": [],
+                "schedules": [],
+            },
+        )
+
+        self.assertEqual(result["deletedActivities"], 1)
+        self.assertEqual(self.store.events, {})
+
     def test_reconcile_updates_activity_from_external_changes(self) -> None:
         self.graph_service.update_activity(
             self.subject,

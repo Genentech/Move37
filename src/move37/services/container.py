@@ -12,6 +12,7 @@ from move37.services.activity_graph import ActivityGraphService
 from move37.services.apple_calendar import AppleCalendarSyncService
 from move37.services.chat import ChatSessionService
 from move37.services.notes import NoteService
+from move37.services.scheduling import SchedulingService
 
 
 class ServiceContainer:
@@ -31,9 +32,10 @@ class ServiceContainer:
             expire_on_commit=False,
         )
         self.apple_calendar_service = AppleCalendarSyncService(self.session_factory)
-        self.activity_graph_service = ActivityGraphService(
+        self.activity_graph_service = ActivityGraphService(self.session_factory)
+        self.scheduling_service = SchedulingService(
             self.session_factory,
-            calendar_sync_service=self.apple_calendar_service,
+            apple_calendar_service=self.apple_calendar_service,
         )
         self.ai_client = Move37AiClient(os.environ.get("MOVE37_AI_BASE_URL"))
         self.note_service = NoteService(self.session_factory, self.activity_graph_service)

@@ -242,9 +242,8 @@ def derive_schedule_edges(
 class ActivityGraphService:
     """Service that owns all graph mutations and graph invariants."""
 
-    def __init__(self, session_factory: sessionmaker, calendar_sync_service: Any | None = None) -> None:
+    def __init__(self, session_factory: sessionmaker) -> None:
         self._session_factory = session_factory
-        self._calendar_sync_service = calendar_sync_service
 
     def get_graph(self, subject: str) -> dict[str, Any]:
         with self._session_factory() as session:
@@ -271,9 +270,7 @@ class ActivityGraphService:
             if would_create_cycle(snapshot["nodes"], snapshot["dependencies"], next_edge):
                 raise ConflictError("That dependency would create a cycle.")
             snapshot["dependencies"].append(next_edge)
-        saved = self._save_graph(subject, snapshot)
-        self._sync_activity(subject, self._find_node(saved["nodes"], node_id))
-        return saved
+        return self._save_graph(subject, snapshot)
 
     def insert_between(
         self,
@@ -297,9 +294,7 @@ class ActivityGraphService:
                 {"parentId": node_id, "childId": child_id},
             ]
         )
-        saved = self._save_graph(subject, snapshot)
-        self._sync_activity(subject, self._find_node(saved["nodes"], node_id))
-        return saved
+        return self._save_graph(subject, snapshot)
 
     def update_activity(self, subject: str, activity_id: str, patch: dict[str, Any]) -> dict[str, Any]:
         snapshot = self.get_graph(subject)
@@ -320,9 +315,7 @@ class ActivityGraphService:
             }:
                 node[field] = value
         saved = self._save_graph(subject, snapshot)
-        saved_node = self._find_node(saved["nodes"], activity_id)
-        self._sync_activity(subject, saved_node)
-        return saved_node
+        return self._find_node(saved["nodes"], activity_id)
 
     def start_work(self, subject: str, activity_id: str, now: datetime | None = None) -> dict[str, Any]:
         snapshot = self.get_graph(subject)
@@ -376,10 +369,7 @@ class ActivityGraphService:
                 if edge["parentId"] == activity_id
             ]
         )
-        saved = self._save_graph(subject, snapshot)
-        for removed_id in remove_ids:
-            self._delete_activity_event(subject, removed_id)
-        return saved
+        return self._save_graph(subject, snapshot)
 
     def delete_activity(self, subject: str, activity_id: str, delete_tree: bool) -> dict[str, Any]:
         snapshot = self.get_graph(subject)
@@ -459,22 +449,6 @@ class ActivityGraphService:
             saved = repository.save_snapshot(subject, sanitized)
             repository.commit()
             return saved
-
-    def _sync_activity(self, subject: str, node: dict[str, Any]) -> None:
-        if self._calendar_sync_service is None:
-            return
-        try:
-            self._calendar_sync_service.sync_activity(subject, node)
-        except Exception:
-            return
-
-    def _delete_activity_event(self, subject: str, activity_id: str) -> None:
-        if self._calendar_sync_service is None:
-            return
-        try:
-            self._calendar_sync_service.delete_activity(subject, activity_id)
-        except Exception:
-            return
 
     @staticmethod
     def _elapsed_hours(started_at: str, now: datetime) -> float:

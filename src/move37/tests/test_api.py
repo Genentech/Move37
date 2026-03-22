@@ -127,6 +127,62 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["updatedActivities"], 2)
 
+    def test_scheduling_replan_returns_plan_summary(self) -> None:
+        self.client.app.state.services.scheduling_service.replan = lambda subject, mode, parameters: {
+            "status": "ok",
+            "summary": {
+                "movedTasks": 1,
+                "conflicts": 0,
+                "unscheduled": 1,
+                "projectsAffected": 1,
+            },
+            "changes": [
+                {
+                    "activityId": "wake-early",
+                    "title": "Wake early",
+                    "previousStartsAt": "2026-03-17T09:00:00+00:00",
+                    "proposedStartsAt": "2026-03-18T09:00:00+00:00",
+                    "deltaMinutes": 1440,
+                    "branchRootId": "wake-early",
+                }
+            ],
+            "conflicts": [],
+            "unscheduled": [
+                {
+                    "activityId": "buy-shoes",
+                    "title": "Buy shoes",
+                    "code": "missing_duration",
+                    "message": "Expected time is required before this task can be scheduled.",
+                }
+            ],
+            "projectImpacts": [
+                {
+                    "branchRootId": "wake-early",
+                    "projectTitle": "Wake early",
+                    "previousCompletionAt": "2026-03-17T17:00:00+00:00",
+                    "proposedCompletionAt": "2026-03-18T17:00:00+00:00",
+                    "deltaMinutes": 1440,
+                }
+            ],
+            "runMetadata": {
+                "engine": "move37-deterministic",
+                "engineVersion": "0.1",
+                "runMode": mode,
+                "computedAt": "2026-03-22T12:00:00+00:00",
+                "applied": mode == "apply",
+            },
+        }
+
+        response = self.client.post(
+            "/v1/scheduling/replan",
+            headers={"Authorization": "Bearer test-token"},
+            json={"mode": "dry_run", "parameters": {}},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["summary"]["movedTasks"], 1)
+        self.assertEqual(response.json()["runMetadata"]["runMode"], "dry_run")
+
     def test_create_note_creates_note_and_parentless_graph_node(self) -> None:
         response = self.client.post(
             "/v1/notes",

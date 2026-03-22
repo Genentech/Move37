@@ -8,6 +8,7 @@ from .auth import router as auth_router
 from .calendar import router as calendar_router
 from .graph import router as graph_router
 from .notes import router as notes_router
+from .scheduling import router as scheduling_router
 
 
 def build_rest_router() -> APIRouter:
@@ -18,4 +19,5 @@ def build_rest_router() -> APIRouter:
     router.include_router(graph_router)
     router.include_router(notes_router)
     router.include_router(calendar_router)
+    router.include_router(scheduling_router)
     return router

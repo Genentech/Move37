@@ -443,6 +443,43 @@ class AppleCalendarSyncService:
             repository.save(next_link)
             session.commit()
 
+    def sync_graph(self, subject: str, snapshot: dict[str, Any] | None = None) -> dict[str, int]:
+        if not self.enabled or self._calendar is None:
+            return {"syncedActivities": 0, "deletedActivities": 0}
+        if snapshot is None:
+            with self._session_factory() as session:
+                graph_repository = ActivityGraphRepository(session)
+                snapshot = graph_repository.get_snapshot(subject)
+        if snapshot is None:
+            return {"syncedActivities": 0, "deletedActivities": 0}
+
+        scheduled_activity_ids: set[str] = set()
+        synced_activities = 0
+        deleted_activities = 0
+        for node in snapshot["nodes"]:
+            if node.get("kind") == "note":
+                continue
+            activity_id = str(node["id"])
+            if str(node.get("startDate") or "").strip():
+                self.sync_activity(subject, node)
+                scheduled_activity_ids.add(activity_id)
+                synced_activities += 1
+
+        with self._session_factory() as session:
+            repository = CalendarEventLinkRepository(session)
+            stale_activity_ids = [
+                link.activity_id
+                for link in repository.list_by_subject(APPLE_PROVIDER, subject)
+                if link.activity_id not in scheduled_activity_ids
+            ]
+        for activity_id in stale_activity_ids:
+            self.delete_activity(subject, activity_id)
+            deleted_activities += 1
+        return {
+            "syncedActivities": synced_activities,
+            "deletedActivities": deleted_activities,
+        }
+
     def delete_activity(self, subject: str, activity_id: str) -> None:
         if not self.enabled or self._calendar is None:
             return

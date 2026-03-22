@@ -53,6 +53,12 @@ export class Move37Client {
     return this.request("POST", "/v1/calendars/apple/reconcile");
   }
 
+  replanSchedule({ mode, parameters = {} }) {
+    return this.request("POST", "/v1/scheduling/replan", {
+      body: { mode, parameters },
+    });
+  }
+
   createActivity(payload) {
     this.logOperation("createActivity", { title: payload?.title, parentIds: payload?.parentIds });
     return this.request("POST", "/v1/activities", { body: payload });

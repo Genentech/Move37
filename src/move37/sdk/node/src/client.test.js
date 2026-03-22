@@ -95,4 +95,45 @@ describe("Move37Client", () => {
       }),
     );
   });
+
+  it("posts scheduling replans as JSON", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        status: "ok",
+        summary: { movedTasks: 1, conflicts: 0, unscheduled: 0, projectsAffected: 1 },
+        changes: [],
+        conflicts: [],
+        unscheduled: [],
+        projectImpacts: [],
+        runMetadata: {
+          engine: "move37-deterministic",
+          engineVersion: "0.1",
+          runMode: "dry_run",
+          computedAt: "2026-03-22T12:00:00+00:00",
+          applied: false,
+        },
+      }),
+    }));
+    const client = new Move37Client({
+      baseUrl: "http://localhost:8080",
+      token: "token-123",
+      fetchImpl,
+    });
+
+    await client.replanSchedule({ mode: "dry_run", parameters: {} });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "http://localhost:8080/v1/scheduling/replan",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-123",
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({ mode: "dry_run", parameters: {} }),
+      }),
+    );
+  });
 });
