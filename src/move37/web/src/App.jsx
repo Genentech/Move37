@@ -3808,15 +3808,9 @@ export default function App() {
       )}
 
       {importPopoverMode === "url" && (
-        <div className="url-import-backdrop" onClick={() => {
-          setImportPopoverMode(null);
-          setUrlImportValue("");
-          setUrlImportLoading(false);
-          setIsImportMenuExpanded(false);
-        }}>
+        <aside className="notes-overlay side-sheet-overlay" onClick={(event) => event.stopPropagation()}>
           <form
-            className="url-import-popup"
-            onClick={(event) => event.stopPropagation()}
+            className="notes-overlay-form side-sheet-form url-import-sidepanel"
             onSubmit={submitUrlImport}
           >
             <div className="url-import-toolbar">
@@ -3855,12 +3849,12 @@ export default function App() {
               />
             </label>
           </form>
-        </div>
+        </aside>
       )}
 
       {syncModalOpen && (
-        <div className="sheet-backdrop" onPointerDown={closeSyncModal}>
-          <aside className="sheet sync-sheet" onPointerDown={(event) => event.stopPropagation()}>
+        <aside className="notes-overlay side-sheet-overlay" onPointerDown={(event) => event.stopPropagation()}>
+          <div className="notes-overlay-form side-sheet-form sync-sidepanel">
             <h2>Sync / Replan</h2>
             <p>
               Run the scheduling engine against the current graph and push the final result to calendars only when
@@ -4019,13 +4013,13 @@ export default function App() {
                 </button>
               </div>
             </form>
-          </aside>
-        </div>
+          </div>
+        </aside>
       )}
 
       {settingsModalOpen && (
-        <div className="sheet-backdrop" onPointerDown={closeSettingsModal}>
-          <aside className="sheet settings-sheet" onPointerDown={(event) => event.stopPropagation()}>
+        <aside className="notes-overlay side-sheet-overlay" onPointerDown={(event) => event.stopPropagation()}>
+          <div className="notes-overlay-form side-sheet-form settings-sidepanel">
             <h2>Settings</h2>
             <p>Manage integrations and choose which calendar Move37 writes to when you apply a plan.</p>
             <section className="settings-section">
@@ -4149,8 +4143,8 @@ export default function App() {
                 </div>
               )}
             </section>
-          </aside>
-        </div>
+          </div>
+        </aside>
       )}
 
       <section
@@ -4739,8 +4733,8 @@ export default function App() {
       ) : null}
 
       {sheet && (
-        <div className="sheet-backdrop" onPointerDown={closeSheet}>
-          <aside className="sheet" onPointerDown={(event) => event.stopPropagation()}>
+        <aside className="notes-overlay side-sheet-overlay" onPointerDown={(event) => event.stopPropagation()}>
+          <div className="notes-overlay-form side-sheet-form">
             {(sheet.type === "create" || sheet.type === "create-child" || sheet.type === "edit" || sheet.type === "insert-between") && (
               <>
                 <h2>
@@ -5104,8 +5098,8 @@ export default function App() {
                 </form>
               </>
             )}
-          </aside>
-        </div>
+          </div>
+        </aside>
       )}
 
     </main>
