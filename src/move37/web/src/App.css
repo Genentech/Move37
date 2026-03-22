@@ -472,16 +472,16 @@
 }
 
 .dock-button.focus-pause {
-  border-color: #ffd98a52;
-  background: linear-gradient(180deg, #312610bf 0%, #291f0ddd 100%);
-  color: #ffe2a6;
-  box-shadow: 0 0 18px #ffd6671d;
+  border-color: #8ee8ff40;
+  background: linear-gradient(180deg, #0d2438bf 0%, #091c30dd 100%);
+  color: #c6f0ff;
+  box-shadow: 0 0 18px #6cd7ff1d;
 }
 
 .dock-button.focus-pause:hover {
-  border-color: #ffe39a74;
-  background: linear-gradient(180deg, #3a2d13e2 0%, #32260fe8 100%);
-  box-shadow: 0 0 20px #ffd66730;
+  border-color: #8ee8ff66;
+  background: linear-gradient(180deg, #0f2a42e2 0%, #0c2238e8 100%);
+  box-shadow: 0 0 20px #6cd7ff30;
 }
 
 .dock-button.focus-stop {
@@ -820,7 +820,7 @@
 }
 
 .task-list-item-meta.working {
-  color: #ffe18d;
+  color: var(--accent);
 }
 
 .task-empty {
@@ -944,7 +944,7 @@
 }
 
 .node-halo.note {
-  fill: #ffd77d30;
+  fill: #b0a0ff30;
 }
 
 .node-core {
@@ -978,13 +978,13 @@
 }
 
 .node-core.working {
-  fill: #ffd667;
+  fill: #8ee8ff;
   stroke: transparent;
 }
 
 .node-core.note {
-  fill: #ffcf70;
-  stroke: #ffe4a8;
+  fill: #c4b5fd;
+  stroke: #ddd6fe;
   stroke-width: 0.45;
 }
 
@@ -1017,7 +1017,7 @@
 }
 
 .node-label.note {
-  fill: #ffe7b8;
+  fill: #c4b5fd;
 }
 
 .node-halo.focus-source,
@@ -1063,7 +1063,7 @@
 }
 
 .focus-node-overlay .node-core.focus-node {
-  filter: drop-shadow(0 0 30px #ffe58a45);
+  filter: drop-shadow(0 0 30px #8ee8ff45);
 }
 
 .focus-node-overlay .node-label.focus-node {
