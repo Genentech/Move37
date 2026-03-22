@@ -50,6 +50,9 @@ class AppleCalendar(CalendarInterface):
     def __init__(self, event_store: Any) -> None:
         self._event_store = event_store
 
+    def discover_calendars(self) -> Sequence[dict[str, Any]]:
+        return self._event_store.discover_calendars()
+
     def list_events(
         self,
         start: datetime,

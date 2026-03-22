@@ -16,6 +16,16 @@ from move37.services.apple_calendar import AppleCalendarSyncService
 class FakeAppleEventStore:
     def __init__(self) -> None:
         self.events: dict[str, object] = {}
+        self.calendars = [
+            {
+                "id": "https://calendar.test/calendars/move37/",
+                "name": "Move37",
+                "readOnly": False,
+            }
+        ]
+
+    def discover_calendars(self) -> list[dict[str, object]]:
+        return list(self.calendars)
 
     def list_events(self, start: datetime, end: datetime, calendar_id: str | None = None) -> list[object]:
         del calendar_id
@@ -164,6 +174,30 @@ class AppleCalendarSyncServiceTest(unittest.TestCase):
 
         self.assertEqual(result["deletedActivities"], 1)
         self.assertEqual(self.store.events, {})
+
+    def test_connect_persists_owner_scoped_account(self) -> None:
+        status = self.calendar_service.connect(
+            self.subject,
+            "user@example.com",
+            "password",
+            base_url="https://calendar.test",
+        )
+
+        self.assertTrue(status["connected"])
+        self.assertEqual(status["ownerEmail"], "user@example.com")
+        self.assertEqual(status["writableCalendarId"], "https://calendar.test/calendars/move37/")
+
+    def test_disconnect_clears_owner_scoped_account(self) -> None:
+        self.calendar_service.connect(
+            self.subject,
+            "user@example.com",
+            "password",
+            base_url="https://calendar.test",
+        )
+
+        status = self.calendar_service.disconnect(self.subject)
+
+        self.assertFalse(status["connected"])
 
     def test_reconcile_updates_activity_from_external_changes(self) -> None:
         self.graph_service.update_activity(

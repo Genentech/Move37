@@ -7,17 +7,23 @@ import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+import json
 from typing import Any
 from urllib.parse import quote, urljoin
 
 import httpx
 from sqlalchemy.orm import sessionmaker
 
-from move37.models.integrations import CalendarEventLinkModel
+from move37.models.integrations import AppleCalendarAccountModel, CalendarEventLinkModel
 from move37.repositories.activity_graph import ActivityGraphRepository
-from move37.repositories.calendar import CalendarConnectionRepository, CalendarEventLinkRepository
+from move37.repositories.calendar import (
+    AppleCalendarAccountRepository,
+    CalendarConnectionRepository,
+    CalendarEventLinkRepository,
+)
 from move37.schemas.calendar import CalendarEvent, CalendarEventUpdate
 from move37.services.calendar import AppleCalendar
+from move37.services.secrets import decrypt_secret, encrypt_secret
 
 APPLE_PROVIDER = "apple"
 DAV_NS = {"d": "DAV:", "c": "urn:ietf:params:xml:ns:caldav"}
@@ -160,6 +166,12 @@ class CalDavAppleEventStore:
         events.sort(key=lambda event: event.starts_at)
         return events
 
+    def discover_calendars(self) -> list[dict[str, Any]]:
+        with self._build_client() as client:
+            principal_url = self._discover_current_user_principal(client)
+            home_set_url = self._discover_calendar_home_set(client, principal_url)
+            return self._discover_calendar_collection_urls(client, home_set_url)
+
     def create_event(self, event: CalendarEvent, calendar_id: str | None = None) -> str:
         calendar_url = _normalize_calendar_url(
             self._config.base_url,
@@ -220,6 +232,91 @@ class CalDavAppleEventStore:
             follow_redirects=True,
             timeout=30.0,
         )
+
+    def _discover_current_user_principal(self, client: httpx.Client) -> str:
+        response = client.request(
+            "PROPFIND",
+            self._config.base_url,
+            headers={
+                "Depth": "0",
+                "Content-Type": "application/xml; charset=utf-8",
+            },
+            content="""<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop>
+    <d:current-user-principal />
+  </d:prop>
+</d:propfind>""",
+        )
+        response.raise_for_status()
+        root = ET.fromstring(response.text)
+        href = root.findtext(".//d:current-user-principal/d:href", default="", namespaces=DAV_NS)
+        return href if href.startswith("http") else urljoin(self._config.base_url.rstrip("/") + "/", href.lstrip("/"))
+
+    def _discover_calendar_home_set(self, client: httpx.Client, principal_url: str) -> str:
+        response = client.request(
+            "PROPFIND",
+            principal_url,
+            headers={
+                "Depth": "0",
+                "Content-Type": "application/xml; charset=utf-8",
+            },
+            content="""<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:prop>
+    <c:calendar-home-set />
+  </d:prop>
+</d:propfind>""",
+        )
+        response.raise_for_status()
+        root = ET.fromstring(response.text)
+        href = root.findtext(".//c:calendar-home-set/d:href", default="", namespaces=DAV_NS)
+        return href if href.startswith("http") else urljoin(self._config.base_url.rstrip("/") + "/", href.lstrip("/"))
+
+    def _discover_calendar_collection_urls(
+        self,
+        client: httpx.Client,
+        home_set_url: str,
+    ) -> list[dict[str, Any]]:
+        response = client.request(
+            "PROPFIND",
+            home_set_url,
+            headers={
+                "Depth": "1",
+                "Content-Type": "application/xml; charset=utf-8",
+            },
+            content="""<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop>
+    <d:displayname />
+    <d:resourcetype />
+  </d:prop>
+</d:propfind>""",
+        )
+        response.raise_for_status()
+        root = ET.fromstring(response.text)
+        calendars: list[dict[str, Any]] = []
+        for node in root.findall("d:response", DAV_NS):
+            href = node.findtext("d:href", default="", namespaces=DAV_NS)
+            prop = node.find("d:propstat/d:prop", DAV_NS)
+            if prop is None:
+                continue
+            resource_type = prop.find("d:resourcetype", DAV_NS)
+            if resource_type is None or resource_type.find("c:calendar", DAV_NS) is None:
+                continue
+            calendar_url = (
+                href if href.startswith("http://") or href.startswith("https://")
+                else urljoin(home_set_url.rstrip("/") + "/", href.lstrip("/"))
+            )
+            display_name = prop.findtext("d:displayname", default="", namespaces=DAV_NS).strip()
+            calendars.append(
+                {
+                    "id": calendar_url.rstrip("/") + "/",
+                    "name": display_name or calendar_url.rstrip("/").split("/")[-1] or "apple",
+                    "readOnly": False,
+                }
+            )
+        return sorted(calendars, key=lambda item: item["name"].lower())
 
     @staticmethod
     def _build_query_payload(start: datetime, end: datetime) -> str:
@@ -345,45 +442,104 @@ class AppleCalendarSyncService:
     def __init__(self, session_factory: sessionmaker, event_store: Any | None = None) -> None:
         self._session_factory = session_factory
         self._config = AppleCalendarConfig.from_env()
-        self._calendar = (
-            AppleCalendar(event_store or CalDavAppleEventStore(self._config))
-            if self._config is not None
-            else None
-        )
+        self._event_store_override = event_store
 
     @property
     def enabled(self) -> bool:
-        return self._calendar is not None and self._config is not None
+        return self._config is not None
 
-    def get_status(self) -> dict[str, Any]:
-        self._ensure_connections()
-        calendars = []
-        if self._config is not None:
-            for calendar_url in self._config.readable_calendar_urls:
-                calendars.append(
-                    {
-                        "id": calendar_url,
-                        "name": calendar_url.rstrip("/").split("/")[-1] or "apple",
-                        "readOnly": calendar_url != self._config.writable_calendar_url,
-                    }
-                )
+    def get_status(self, subject: str | None = None) -> dict[str, Any]:
+        config = self._resolve_config(subject)
+        self._ensure_connections(config)
+        calendars = self._serialize_calendars(config) if config is not None else []
         return {
-            "enabled": self.enabled,
-            "connected": self.enabled,
+            "enabled": True,
+            "connected": config is not None,
             "provider": APPLE_PROVIDER,
-            "writableCalendarId": self._config.writable_calendar_url if self._config else None,
+            "writableCalendarId": config.writable_calendar_url if config else None,
+            "ownerEmail": config.username if config else None,
+            "baseUrl": config.base_url if config else None,
             "calendars": calendars,
         }
 
+    def connect(
+        self,
+        subject: str,
+        username: str,
+        password: str,
+        base_url: str | None = None,
+        writable_calendar_id: str | None = None,
+    ) -> dict[str, Any]:
+        config = AppleCalendarConfig(
+            base_url=(base_url or "https://caldav.icloud.com").strip().rstrip("/"),
+            username=username.strip(),
+            password=password,
+            writable_calendar_id="",
+            readable_calendar_ids=(),
+        )
+        calendars = self._build_calendar(config).discover_calendars()
+        if not calendars:
+            raise ValueError("No Apple calendars were discovered for this account.")
+        chosen_writable = writable_calendar_id or calendars[0]["id"]
+        readable_calendar_ids = tuple(calendar["id"] for calendar in calendars)
+        next_config = AppleCalendarConfig(
+            base_url=config.base_url,
+            username=config.username,
+            password=password,
+            writable_calendar_id=chosen_writable,
+            readable_calendar_ids=readable_calendar_ids,
+        )
+        with self._session_factory() as session:
+            repository = AppleCalendarAccountRepository(session)
+            account = repository.get_by_subject(subject) or AppleCalendarAccountModel(owner_subject=subject)
+            account.base_url = next_config.base_url
+            account.username = next_config.username
+            account.password_ciphertext = encrypt_secret(password)
+            account.writable_calendar_id = next_config.writable_calendar_url
+            account.readable_calendar_ids = json.dumps(list(readable_calendar_ids))
+            repository.save(account)
+            session.commit()
+        self._ensure_connections(next_config)
+        return self.get_status(subject)
+
+    def disconnect(self, subject: str) -> dict[str, Any]:
+        with self._session_factory() as session:
+            repository = AppleCalendarAccountRepository(session)
+            account = repository.get_by_subject(subject)
+            if account is not None:
+                repository.delete(account)
+                session.commit()
+        return self.get_status(subject)
+
+    def update_preferences(
+        self,
+        subject: str,
+        writable_calendar_id: str,
+    ) -> dict[str, Any]:
+        with self._session_factory() as session:
+            repository = AppleCalendarAccountRepository(session)
+            account = repository.get_by_subject(subject)
+            if account is None:
+                raise ValueError("Apple Calendar is not connected.")
+            readable_calendar_ids = tuple(json.loads(account.readable_calendar_ids or "[]"))
+            if writable_calendar_id not in readable_calendar_ids:
+                raise ValueError("Selected calendar is not available for this account.")
+            account.writable_calendar_id = writable_calendar_id
+            repository.save(account)
+            session.commit()
+        return self.get_status(subject)
+
     def list_events(self, subject: str, start: datetime, end: datetime) -> list[dict[str, Any]]:
-        self._ensure_connections()
-        if not self.enabled or self._calendar is None:
+        config = self._resolve_config(subject)
+        if config is None:
             return []
+        self._ensure_connections(config)
+        calendar = self._build_calendar(config)
         with self._session_factory() as session:
             links = CalendarEventLinkRepository(session).list_by_subject(APPLE_PROVIDER, subject)
             linked_by_event = {link.external_event_id: link for link in links}
         payload = []
-        for event in self._calendar.list_events(start=start, end=end):
+        for event in calendar.list_events(start=start, end=end):
             event_id = event.id or event.metadata.get("href") or event.metadata.get("uid")
             link = linked_by_event.get(event_id)
             payload.append(
@@ -402,15 +558,17 @@ class AppleCalendarSyncService:
         return payload
 
     def sync_activity(self, subject: str, node: dict[str, Any]) -> None:
-        if not self.enabled or self._calendar is None or node.get("kind") == "note":
+        config = self._resolve_config(subject)
+        if config is None or node.get("kind") == "note":
             return
+        calendar = self._build_calendar(config)
         with self._session_factory() as session:
             repository = CalendarEventLinkRepository(session)
             link = repository.get_by_activity(APPLE_PROVIDER, subject, str(node["id"]))
             start_date = str(node.get("startDate") or "").strip()
             if not start_date:
                 if link is not None:
-                    self._calendar.delete_event(link.external_event_id, calendar_id=link.external_calendar_id)
+                    calendar.delete_event(link.external_event_id, calendar_id=link.external_calendar_id)
                     repository.delete(link)
                     session.commit()
                 return
@@ -422,29 +580,30 @@ class AppleCalendarSyncService:
                 ends_at=ends_at,
                 all_day=True,
                 description=str(node.get("notes") or "") or None,
-                calendar_id=self._config.writable_calendar_url,
-                calendar_name=self._config.writable_calendar_url.rstrip("/").split("/")[-1],
+                calendar_id=config.writable_calendar_url,
+                calendar_name=config.writable_calendar_url.rstrip("/").split("/")[-1],
                 metadata={
                     "uid": f"move37-{subject}-{node['id']}",
                     "activityId": str(node["id"]),
                 },
             )
-            event_id = self._calendar.create_event(event, calendar_id=self._config.writable_calendar_url)
+            event_id = calendar.create_event(event, calendar_id=config.writable_calendar_url)
             next_link = link or CalendarEventLinkModel(
                 provider=APPLE_PROVIDER,
                 owner_subject=subject,
                 activity_id=str(node["id"]),
-                external_calendar_id=self._config.writable_calendar_url,
+                external_calendar_id=config.writable_calendar_url,
                 external_event_id=event_id,
                 managed_by_move37=True,
             )
-            next_link.external_calendar_id = self._config.writable_calendar_url
+            next_link.external_calendar_id = config.writable_calendar_url
             next_link.external_event_id = event_id
             repository.save(next_link)
             session.commit()
 
     def sync_graph(self, subject: str, snapshot: dict[str, Any] | None = None) -> dict[str, int]:
-        if not self.enabled or self._calendar is None:
+        config = self._resolve_config(subject)
+        if config is None:
             return {"syncedActivities": 0, "deletedActivities": 0}
         if snapshot is None:
             with self._session_factory() as session:
@@ -481,24 +640,28 @@ class AppleCalendarSyncService:
         }
 
     def delete_activity(self, subject: str, activity_id: str) -> None:
-        if not self.enabled or self._calendar is None:
+        config = self._resolve_config(subject)
+        if config is None:
             return
+        calendar = self._build_calendar(config)
         with self._session_factory() as session:
             repository = CalendarEventLinkRepository(session)
             link = repository.get_by_activity(APPLE_PROVIDER, subject, activity_id)
             if link is None:
                 return
-            self._calendar.delete_event(link.external_event_id, calendar_id=link.external_calendar_id)
+            calendar.delete_event(link.external_event_id, calendar_id=link.external_calendar_id)
             repository.delete(link)
             session.commit()
 
     def reconcile(self, subject: str) -> dict[str, int]:
-        self._ensure_connections()
-        if not self.enabled or self._calendar is None:
+        config = self._resolve_config(subject)
+        if config is None:
             return {"updatedActivities": 0, "clearedActivities": 0}
+        self._ensure_connections(config)
+        calendar = self._build_calendar(config)
         start = datetime.now(UTC) - timedelta(days=90)
         end = datetime.now(UTC) + timedelta(days=365)
-        events = self._calendar.list_events(start=start, end=end)
+        events = calendar.list_events(start=start, end=end)
         events_by_id = {event.id: event for event in events if event.id}
         updated_activities = 0
         cleared_activities = 0
@@ -539,15 +702,47 @@ class AppleCalendarSyncService:
             session.commit()
         return {"updatedActivities": updated_activities, "clearedActivities": cleared_activities}
 
-    def _ensure_connections(self) -> None:
-        if self._config is None:
+    def _ensure_connections(self, config: AppleCalendarConfig | None) -> None:
+        if config is None:
             return
         with self._session_factory() as session:
             repository = CalendarConnectionRepository(session)
-            for calendar_url in self._config.readable_calendar_urls:
+            for calendar_url in config.readable_calendar_urls:
                 repository.upsert(
                     provider=APPLE_PROVIDER,
                     external_calendar_id=calendar_url,
-                    owner_email=self._config.username,
+                    owner_email=config.username,
                 )
             session.commit()
+
+    def _resolve_config(self, subject: str | None) -> AppleCalendarConfig | None:
+        if subject:
+            with self._session_factory() as session:
+                repository = AppleCalendarAccountRepository(session)
+                account = repository.get_by_subject(subject)
+            if account is not None:
+                readable_calendar_ids = tuple(json.loads(account.readable_calendar_ids or "[]"))
+                writable_calendar_id = account.writable_calendar_id or (readable_calendar_ids[0] if readable_calendar_ids else "")
+                return AppleCalendarConfig(
+                    base_url=account.base_url,
+                    username=account.username,
+                    password=decrypt_secret(account.password_ciphertext),
+                    writable_calendar_id=writable_calendar_id,
+                    readable_calendar_ids=readable_calendar_ids,
+                )
+        return self._config
+
+    def _build_calendar(self, config: AppleCalendarConfig) -> AppleCalendar:
+        event_store = self._event_store_override or CalDavAppleEventStore(config)
+        return AppleCalendar(event_store)
+
+    @staticmethod
+    def _serialize_calendars(config: AppleCalendarConfig) -> list[dict[str, Any]]:
+        return [
+            {
+                "id": calendar_url,
+                "name": calendar_url.rstrip("/").split("/")[-1] or "apple",
+                "readOnly": calendar_url != config.writable_calendar_url,
+            }
+            for calendar_url in config.readable_calendar_urls
+        ]

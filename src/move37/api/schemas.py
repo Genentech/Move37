@@ -286,7 +286,28 @@ class AppleCalendarStatusOutput(BaseModel):
     connected: bool
     provider: str
     writableCalendarId: str | None = None
+    ownerEmail: str | None = None
+    baseUrl: str | None = None
     calendars: list[CalendarDescriptorOutput]
+
+
+class AppleCalendarConnectInput(BaseModel):
+    """Connect an Apple Calendar account for the active user."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    username: str = Field(min_length=1)
+    password: str = Field(min_length=1)
+    baseUrl: str | None = None
+    writableCalendarId: str | None = None
+
+
+class AppleCalendarPreferencesInput(BaseModel):
+    """Writable-calendar selection for Apple Calendar."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    writableCalendarId: str = Field(min_length=1)
 
 
 class CalendarEventOutput(BaseModel):

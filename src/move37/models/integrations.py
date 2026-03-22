@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import Integer, String, UniqueConstraint
+from sqlalchemy import Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampMixin
@@ -66,6 +66,26 @@ class CalendarEventLinkModel(TimestampMixin, Base):
     external_event_id: Mapped[str] = mapped_column(String(255), nullable=False)
     managed_by_move37: Mapped[bool] = mapped_column(nullable=False, default=True)
     last_seen_etag: Mapped[str | None] = mapped_column(String(255))
+
+
+class AppleCalendarAccountModel(TimestampMixin, Base):
+    """Persisted Apple Calendar credentials and calendar preferences."""
+
+    __tablename__ = "apple_calendar_accounts"
+    __table_args__ = (
+        UniqueConstraint(
+            "owner_subject",
+            name="uq_apple_calendar_accounts_owner_subject",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    base_url: Mapped[str] = mapped_column(String(255), nullable=False)
+    username: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_ciphertext: Mapped[str] = mapped_column(Text(), nullable=False)
+    writable_calendar_id: Mapped[str | None] = mapped_column(String(255))
+    readable_calendar_ids: Mapped[str | None] = mapped_column(Text())
 
 
 class BankAccountConnectionModel(TimestampMixin, Base):

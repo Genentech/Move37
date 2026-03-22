@@ -136,4 +136,47 @@ describe("Move37Client", () => {
       }),
     );
   });
+
+  it("posts Apple Calendar connect payloads as JSON", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        enabled: true,
+        connected: true,
+        provider: "apple",
+        writableCalendarId: "https://calendar.test/caldav/work/",
+        ownerEmail: "user@example.com",
+        baseUrl: "https://calendar.test",
+        calendars: [],
+      }),
+    }));
+    const client = new Move37Client({
+      baseUrl: "http://localhost:8080",
+      token: "token-123",
+      fetchImpl,
+    });
+
+    await client.connectAppleCalendar({
+      username: "user@example.com",
+      password: "app-password",
+      baseUrl: "https://calendar.test",
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "http://localhost:8080/v1/integrations/apple/connect",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer token-123",
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          username: "user@example.com",
+          password: "app-password",
+          baseUrl: "https://calendar.test",
+        }),
+      }),
+    );
+  });
 });

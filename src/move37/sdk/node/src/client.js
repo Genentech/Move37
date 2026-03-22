@@ -43,6 +43,26 @@ export class Move37Client {
     return this.request("GET", "/v1/calendars/apple/status");
   }
 
+  getAppleIntegrationStatus() {
+    return this.request("GET", "/v1/integrations/apple/status");
+  }
+
+  connectAppleCalendar(payload) {
+    return this.request("POST", "/v1/integrations/apple/connect", {
+      body: payload,
+    });
+  }
+
+  disconnectAppleCalendar() {
+    return this.request("POST", "/v1/integrations/apple/disconnect");
+  }
+
+  updateAppleCalendarPreferences(payload) {
+    return this.request("PUT", "/v1/integrations/apple/preferences", {
+      body: payload,
+    });
+  }
+
   listAppleCalendarEvents({ start, end }) {
     return this.request("GET", "/v1/calendars/apple/events", {
       query: { start, end },

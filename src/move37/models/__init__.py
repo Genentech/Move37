@@ -9,6 +9,7 @@ from .activity_graph import (
 from .base import Base
 from .chat import ChatMessageModel, ChatSessionModel
 from .integrations import (
+    AppleCalendarAccountModel,
     BankAccountConnectionModel,
     CalendarConnectionModel,
     CalendarEventLinkModel,
@@ -21,6 +22,7 @@ __all__ = [
     "ActivityGraphModel",
     "ActivityNodeModel",
     "ActivityScheduleModel",
+    "AppleCalendarAccountModel",
     "BankAccountConnectionModel",
     "Base",
     "ChatMessageModel",

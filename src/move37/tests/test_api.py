@@ -183,6 +183,58 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(response.json()["summary"]["movedTasks"], 1)
         self.assertEqual(response.json()["runMetadata"]["runMode"], "dry_run")
 
+    def test_apple_integration_status_returns_owner_scoped_status(self) -> None:
+        self.client.app.state.services.apple_calendar_service.get_status = lambda subject=None: {
+            "enabled": True,
+            "connected": False,
+            "provider": "apple",
+            "writableCalendarId": None,
+            "ownerEmail": None,
+            "baseUrl": None,
+            "calendars": [],
+        }
+
+        response = self.client.get(
+            "/v1/integrations/apple/status",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["connected"])
+
+    def test_apple_integration_connect_returns_connected_status(self) -> None:
+        self.client.app.state.services.apple_calendar_service.connect = (
+            lambda subject, username, password, base_url=None, writable_calendar_id=None: {
+                "enabled": True,
+                "connected": True,
+                "provider": "apple",
+                "writableCalendarId": writable_calendar_id or "https://calendar.test/cal/work/",
+                "ownerEmail": username,
+                "baseUrl": base_url or "https://calendar.test",
+                "calendars": [
+                    {
+                        "id": "https://calendar.test/cal/work/",
+                        "name": "work",
+                        "readOnly": False,
+                    }
+                ],
+            }
+        )
+
+        response = self.client.post(
+            "/v1/integrations/apple/connect",
+            headers={"Authorization": "Bearer test-token"},
+            json={
+                "username": "user@example.com",
+                "password": "app-password",
+                "baseUrl": "https://calendar.test",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["connected"])
+        self.assertEqual(response.json()["ownerEmail"], "user@example.com")
+
     def test_create_note_creates_note_and_parentless_graph_node(self) -> None:
         response = self.client.post(
             "/v1/notes",
