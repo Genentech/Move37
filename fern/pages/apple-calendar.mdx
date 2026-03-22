@@ -1,0 +1,43 @@
+---
+title: Apple Calendar
+description: Connect your iCloud calendar to Move37 so tasks can be scheduled and tracked alongside your existing events.
+---
+
+## What the integration does
+
+Move37 syncs with your Apple Calendar via CalDAV. Once connected, Move37 can read your existing events to understand your availability and write scheduled tasks back to a calendar of your choosing — keeping everything in one place without leaving your native calendar app.
+
+## Before you connect
+
+Apple requires an **app-specific password** to allow third-party apps like Move37 to access your iCloud account. Your main Apple ID password will not work.
+
+To generate one:
+
+1. Go to [account.apple.com](https://account.apple.com) and sign in.
+2. Under the **Sign-In and Security** section, choose **App-Specific Passwords**.
+3. Click the **+** button, give the password a label (e.g. "Move37"), and click **Create**.
+4. Copy the password — it is only shown once.
+
+Apple's own guide is available at [support.apple.com/en-us/102654](https://support.apple.com/en-us/102654).
+
+## Connecting via the settings panel
+
+1. Open Move37 and click the **gear icon** (⚙) in the top-right corner to open the settings panel.
+2. Under **Apple Calendar**, click **Connect**.
+3. Enter your **Apple ID email** (the address you use to sign in to iCloud).
+4. Paste the **app-specific password** you generated above.
+5. The **CalDAV URL** defaults to `https://caldav.icloud.com` — leave this unchanged unless your organisation uses a custom CalDAV server.
+6. Click **Connect**. Move37 will verify your credentials and list your available calendars.
+
+## Selecting a writable calendar
+
+After connecting, Move37 will display the calendars associated with your account. Choose the one you want Move37 to write scheduled tasks to. You can change this selection at any time from the same settings panel.
+
+## Disconnecting
+
+To remove the integration:
+
+1. Open the settings panel via the gear icon.
+2. Under **Apple Calendar**, click **Disconnect**.
+
+Move37 will immediately stop syncing and remove your stored credentials. Events already written to your calendar are not deleted.
