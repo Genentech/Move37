@@ -2464,6 +2464,9 @@ export default function App() {
   }
 
   function openUrlImportPopover() {
+    setSyncModalOpen(false);
+    setSettingsModalOpen(false);
+    closeLeftPanel();
     setImportPopoverMode("url");
     setIsImportMenuExpanded(false);
   }
@@ -2509,6 +2512,8 @@ export default function App() {
     setIsImportMenuExpanded(false);
     setIsModeMenuExpanded(false);
     setSettingsModalOpen(false);
+    setImportPopoverMode(null);
+    closeLeftPanel();
     resetSyncState();
     setSyncModalOpen(true);
   }
@@ -2540,6 +2545,8 @@ export default function App() {
     setIsImportMenuExpanded(false);
     setIsModeMenuExpanded(false);
     setSyncModalOpen(false);
+    setImportPopoverMode(null);
+    closeLeftPanel();
     setSettingsError("");
     setSettingsModalOpen(true);
   }
@@ -2929,6 +2936,8 @@ export default function App() {
   }
 
   function openDraftNoteWorkspace() {
+    setSyncModalOpen(false);
+    setSettingsModalOpen(false);
     stopViewportTween();
     setContextMenu(null);
     setSelectedId(null);
@@ -3527,15 +3536,6 @@ export default function App() {
               >
                 <SaveIcon />
               </button>
-              <button
-                type="button"
-                className="dock-button"
-                onClick={closeLeftPanel}
-                aria-label="Exit note editor"
-                title="Exit note editor"
-              >
-                <ExitIcon />
-              </button>
             </>
           ) : null}
           {selected && selected.kind !== "note" && !focusNodeId ? (
@@ -3689,7 +3689,7 @@ export default function App() {
             <button
               type="button"
               className={`dock-button ${syncModalOpen ? "active" : ""}`}
-              onClick={openSyncModal}
+              onClick={() => syncModalOpen ? closeSyncModal() : openSyncModal()}
               aria-label="Open sync and replan controls"
               title="Sync / Replan"
             >
@@ -3698,7 +3698,7 @@ export default function App() {
             <button
               type="button"
               className={`dock-button ${settingsModalOpen ? "active" : ""}`}
-              onClick={openSettingsModal}
+              onClick={() => settingsModalOpen ? closeSettingsModal() : openSettingsModal()}
               aria-label="Open settings"
               title="Settings"
             >
@@ -3732,21 +3732,21 @@ export default function App() {
               <div className="dock-import-actions" aria-hidden={!isImportMenuExpanded}>
                 <button
                   type="button"
-                  className="dock-subaction"
+                  className="dock-subaction icon-only"
                   onClick={triggerBrowseImport}
                   title="Browse .txt files"
+                  aria-label="Browse .txt files"
                 >
                   <ImportIcon />
-                  <span>Browse</span>
                 </button>
                 <button
                   type="button"
-                  className="dock-subaction"
+                  className="dock-subaction icon-only"
                   onClick={openUrlImportPopover}
                   title="Import from URL"
+                  aria-label="Import from URL"
                 >
                   <LinkIcon />
-                  <span>URL</span>
                 </button>
               </div>
               <input
@@ -3822,20 +3822,6 @@ export default function App() {
                 disabled={urlImportLoading}
               >
                 <ImportIcon />
-              </button>
-              <button
-                type="button"
-                className="overlay-icon-button"
-                onClick={() => {
-                  setImportPopoverMode(null);
-                  setUrlImportValue("");
-                  setUrlImportLoading(false);
-                  setIsImportMenuExpanded(false);
-                }}
-                aria-label="Close URL import"
-                title="Close URL import"
-              >
-                <ExitIcon />
               </button>
             </div>
             <label className="url-import-field">
@@ -4005,9 +3991,6 @@ export default function App() {
                 </div>
               ) : null}
               <div className="sheet-actions">
-                <button type="button" className="ghost-button" onClick={closeSyncModal}>
-                  Close
-                </button>
                 <button type="submit" className="ghost-button" disabled={syncPending}>
                   {SYNC_MODE_COPY[syncRunMode].actionLabel}
                 </button>
@@ -4068,11 +4051,8 @@ export default function App() {
                     For iCloud, use an app-specific password from your Apple account security settings.
                   </p>
                   <div className="sheet-actions">
-                    <button type="button" className="ghost-button" onClick={closeSettingsModal}>
-                      Close
-                    </button>
-                    <button type="submit" className="ghost-button" disabled={appleIntegrationMutating}>
-                      Connect
+                    <button type="submit" className="ghost-button icon-only" title="Connect Apple Calendar" aria-label="Connect Apple Calendar" disabled={appleIntegrationMutating}>
+                      <LinkIcon />
                     </button>
                   </div>
                 </form>
@@ -4124,20 +4104,17 @@ export default function App() {
                     <div className="sheet-actions split">
                       <button
                         type="button"
-                        className="ghost-button"
+                        className="ghost-button icon-only"
                         onClick={handleAppleDisconnect}
                         disabled={appleIntegrationMutating}
+                        title="Disconnect Apple Calendar"
+                        aria-label="Disconnect Apple Calendar"
                       >
-                        Disconnect
+                        <ExitIcon />
                       </button>
-                      <div className="settings-actions">
-                        <button type="button" className="ghost-button" onClick={closeSettingsModal}>
-                          Close
-                        </button>
-                        <button type="submit" className="ghost-button" disabled={appleIntegrationMutating}>
-                          Save target
-                        </button>
-                      </div>
+                      <button type="submit" className="ghost-button" disabled={appleIntegrationMutating}>
+                        Save target
+                      </button>
                     </div>
                   </form>
                 </div>

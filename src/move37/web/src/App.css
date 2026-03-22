@@ -104,6 +104,19 @@
   font: 700 0.7rem/1 "IBM Plex Mono", "Courier New", monospace;
 }
 
+.ghost-button.icon-only {
+  width: 1.9rem;
+  min-height: 1.9rem;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.ghost-button.icon-only svg {
+  width: 1rem;
+  height: 1rem;
+}
+
 .topbar-actions {
   position: fixed;
   left: calc(50% - 3rem);
