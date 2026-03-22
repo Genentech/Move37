@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useActivityGraph, useNotes, useSchedulingReplan } from "@move37/sdk/react";
+import {
+  useActivityGraph,
+  useAppleCalendarIntegration,
+  useNotes,
+  useSchedulingReplan,
+} from "@move37/sdk/react";
 import "./App.css";
 import {
   buildIndexes,
@@ -35,6 +40,7 @@ const SYNC_MODE_COPY = {
     actionLabel: "Apply plan",
   },
 };
+const DEFAULT_APPLE_BASE_URL = "https://caldav.icloud.com";
 const LINEAR_TITLE_COLLATOR = new Intl.Collator("en", {
   numeric: true,
   sensitivity: "base",
@@ -170,6 +176,22 @@ function formatSchedulingCode(code) {
     return "Scheduling issue";
   }
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function SettingsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="2.7" className="icon-globe-outline" />
+      <path d="M12 4.7v2.2" className="icon-map-line" />
+      <path d="M12 17.1v2.2" className="icon-map-line" />
+      <path d="M19.3 12h-2.2" className="icon-map-line" />
+      <path d="M6.9 12H4.7" className="icon-map-line" />
+      <path d="M17.2 6.8l-1.5 1.5" className="icon-map-line" />
+      <path d="M8.3 15.7l-1.5 1.5" className="icon-map-line" />
+      <path d="M17.2 17.2l-1.5-1.5" className="icon-map-line" />
+      <path d="M8.3 8.3L6.8 6.8" className="icon-map-line" />
+    </svg>
+  );
 }
 
 function interpolateProjectedGraphs(fromProjected, toProjected, nodes, progress) {
@@ -1370,6 +1392,15 @@ export default function App() {
     run: runSchedulingReplan,
     clear: clearSchedulingRun,
   } = useSchedulingReplan(apiOptions);
+  const {
+    status: appleIntegrationStatus,
+    loading: appleIntegrationLoading,
+    mutating: appleIntegrationMutating,
+    error: appleIntegrationError,
+    connect: connectAppleCalendar,
+    disconnect: disconnectAppleCalendar,
+    updatePreferences: updateAppleCalendarPreferences,
+  } = useAppleCalendarIntegration(apiOptions);
   const [graph, setGraph] = useState(() => sanitizeGraph(EMPTY_GRAPH));
   const [transition, setTransition] = useState(null);
   const [modeMorph, setModeMorph] = useState(null);
@@ -1395,6 +1426,14 @@ export default function App() {
   const [contextMenu, setContextMenu] = useState(null);
   const [sheet, setSheet] = useState(null);
   const [form, setForm] = useState(defaultForm(null));
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [settingsError, setSettingsError] = useState("");
+  const [appleSettingsForm, setAppleSettingsForm] = useState({
+    username: "",
+    password: "",
+    baseUrl: DEFAULT_APPLE_BASE_URL,
+    writableCalendarId: "",
+  });
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [syncRunMode, setSyncRunMode] = useState("dry_run");
   const [syncResult, setSyncResult] = useState(null);
@@ -1457,6 +1496,29 @@ export default function App() {
   }, [apiError]);
 
   useEffect(() => {
+    if (!appleIntegrationStatus) {
+      return;
+    }
+    setAppleSettingsForm((current) => ({
+      username: appleIntegrationStatus.ownerEmail || current.username,
+      password: "",
+      baseUrl: appleIntegrationStatus.baseUrl || current.baseUrl || DEFAULT_APPLE_BASE_URL,
+      writableCalendarId: appleIntegrationStatus.writableCalendarId || current.writableCalendarId,
+    }));
+  }, [
+    appleIntegrationStatus?.baseUrl,
+    appleIntegrationStatus?.ownerEmail,
+    appleIntegrationStatus?.writableCalendarId,
+  ]);
+
+  useEffect(() => {
+    if (!appleIntegrationError) {
+      return;
+    }
+    setSettingsError(appleIntegrationError.message);
+  }, [appleIntegrationError]);
+
+  useEffect(() => {
     const node = shellRef.current;
     if (!node) {
       return undefined;
@@ -1502,6 +1564,10 @@ export default function App() {
       if (event.key !== "Escape") {
         return;
       }
+      if (settingsModalOpen) {
+        closeSettingsModal();
+        return;
+      }
       if (syncModalOpen) {
         closeSyncModal();
         return;
@@ -1520,7 +1586,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [contextMenu, displayedSurfaceMode, sheet, surfaceClosingMode, surfaceMode, syncModalOpen]);
+  }, [contextMenu, displayedSurfaceMode, settingsModalOpen, sheet, surfaceClosingMode, surfaceMode, syncModalOpen]);
 
   useEffect(() => {
     const shouldRotate3D =
@@ -2442,6 +2508,7 @@ export default function App() {
     setContextMenu(null);
     setIsImportMenuExpanded(false);
     setIsModeMenuExpanded(false);
+    setSettingsModalOpen(false);
     resetSyncState();
     setSyncModalOpen(true);
   }
@@ -2465,6 +2532,77 @@ export default function App() {
       }
     } catch (nextError) {
       setSyncError(nextError instanceof Error ? nextError.message : String(nextError));
+    }
+  }
+
+  function openSettingsModal() {
+    setContextMenu(null);
+    setIsImportMenuExpanded(false);
+    setIsModeMenuExpanded(false);
+    setSyncModalOpen(false);
+    setSettingsError("");
+    setSettingsModalOpen(true);
+  }
+
+  function closeSettingsModal() {
+    setSettingsModalOpen(false);
+    setSettingsError("");
+    setAppleSettingsForm((current) => ({
+      username: appleIntegrationStatus?.ownerEmail || current.username,
+      password: "",
+      baseUrl: appleIntegrationStatus?.baseUrl || current.baseUrl || DEFAULT_APPLE_BASE_URL,
+      writableCalendarId: appleIntegrationStatus?.writableCalendarId || current.writableCalendarId,
+    }));
+  }
+
+  async function submitAppleConnection(event) {
+    event.preventDefault();
+    setSettingsError("");
+    if (!appleSettingsForm.username.trim() || !appleSettingsForm.password.trim()) {
+      setSettingsError("Apple ID email and app-specific password are required.");
+      return;
+    }
+    try {
+      await connectAppleCalendar({
+        username: appleSettingsForm.username.trim(),
+        password: appleSettingsForm.password,
+        baseUrl: (appleSettingsForm.baseUrl || DEFAULT_APPLE_BASE_URL).trim(),
+        writableCalendarId: appleSettingsForm.writableCalendarId || undefined,
+      });
+      setAppleSettingsForm((current) => ({ ...current, password: "" }));
+    } catch (nextError) {
+      setSettingsError(nextError instanceof Error ? nextError.message : String(nextError));
+    }
+  }
+
+  async function submitApplePreferences(event) {
+    event.preventDefault();
+    setSettingsError("");
+    if (!appleSettingsForm.writableCalendarId) {
+      setSettingsError("Choose a writable calendar first.");
+      return;
+    }
+    try {
+      await updateAppleCalendarPreferences({
+        writableCalendarId: appleSettingsForm.writableCalendarId,
+      });
+    } catch (nextError) {
+      setSettingsError(nextError instanceof Error ? nextError.message : String(nextError));
+    }
+  }
+
+  async function handleAppleDisconnect() {
+    setSettingsError("");
+    try {
+      await disconnectAppleCalendar();
+      setAppleSettingsForm({
+        username: "",
+        password: "",
+        baseUrl: DEFAULT_APPLE_BASE_URL,
+        writableCalendarId: "",
+      });
+    } catch (nextError) {
+      setSettingsError(nextError instanceof Error ? nextError.message : String(nextError));
     }
   }
 
@@ -3559,6 +3697,15 @@ export default function App() {
             </button>
             <button
               type="button"
+              className={`dock-button ${settingsModalOpen ? "active" : ""}`}
+              onClick={openSettingsModal}
+              aria-label="Open settings"
+              title="Settings"
+            >
+              <SettingsIcon />
+            </button>
+            <button
+              type="button"
               className={`dock-button ${leftPanel === "note-editor" ? "active" : ""}`}
               onClick={() => {
                 if (leftPanel === "note-editor") {
@@ -3872,6 +4019,136 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </aside>
+        </div>
+      )}
+
+      {settingsModalOpen && (
+        <div className="sheet-backdrop" onPointerDown={closeSettingsModal}>
+          <aside className="sheet settings-sheet" onPointerDown={(event) => event.stopPropagation()}>
+            <h2>Settings</h2>
+            <p>Manage integrations and choose which calendar Move37 writes to when you apply a plan.</p>
+            <section className="settings-section">
+              <div className="sync-section-header">
+                <h3>Apple Calendar</h3>
+                <span>{appleIntegrationStatus?.connected ? "Connected" : "Not connected"}</span>
+              </div>
+              {settingsError ? <div className="sync-feedback error">{settingsError}</div> : null}
+              {appleIntegrationLoading ? <div className="sync-feedback">Loading Apple Calendar status…</div> : null}
+              {!appleIntegrationStatus?.connected ? (
+                <form className="sheet-form" onSubmit={submitAppleConnection}>
+                  <label>
+                    Apple ID email
+                    <input
+                      type="email"
+                      value={appleSettingsForm.username}
+                      onChange={(event) =>
+                        setAppleSettingsForm((current) => ({ ...current, username: event.target.value }))
+                      }
+                      placeholder="name@icloud.com"
+                    />
+                  </label>
+                  <label>
+                    App-specific password
+                    <input
+                      type="password"
+                      value={appleSettingsForm.password}
+                      onChange={(event) =>
+                        setAppleSettingsForm((current) => ({ ...current, password: event.target.value }))
+                      }
+                      placeholder="xxxx-xxxx-xxxx-xxxx"
+                    />
+                  </label>
+                  <label>
+                    CalDAV base URL
+                    <input
+                      type="url"
+                      value={appleSettingsForm.baseUrl}
+                      onChange={(event) =>
+                        setAppleSettingsForm((current) => ({ ...current, baseUrl: event.target.value }))
+                      }
+                      placeholder={DEFAULT_APPLE_BASE_URL}
+                    />
+                  </label>
+                  <p className="small">
+                    For iCloud, use an app-specific password from your Apple account security settings.
+                  </p>
+                  <div className="sheet-actions">
+                    <button type="button" className="ghost-button" onClick={closeSettingsModal}>
+                      Close
+                    </button>
+                    <button type="submit" className="ghost-button" disabled={appleIntegrationMutating}>
+                      Connect
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="settings-stack">
+                  <div className="metric-grid">
+                    <div className="metric-card">
+                      <span>Apple ID</span>
+                      <strong>{appleIntegrationStatus.ownerEmail || "Unknown"}</strong>
+                    </div>
+                    <div className="metric-card">
+                      <span>Base URL</span>
+                      <strong>{appleIntegrationStatus.baseUrl || DEFAULT_APPLE_BASE_URL}</strong>
+                    </div>
+                  </div>
+                  <form className="sheet-form" onSubmit={submitApplePreferences}>
+                    <label>
+                      Writable calendar
+                      <select
+                        value={appleSettingsForm.writableCalendarId}
+                        onChange={(event) =>
+                          setAppleSettingsForm((current) => ({
+                            ...current,
+                            writableCalendarId: event.target.value,
+                          }))
+                        }
+                      >
+                        <option value="">Select a calendar</option>
+                        {(appleIntegrationStatus.calendars || []).map((calendar) => (
+                          <option key={calendar.id} value={calendar.id}>
+                            {calendar.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="settings-calendar-list">
+                      {(appleIntegrationStatus.calendars || []).map((calendar) => (
+                        <div key={calendar.id} className="sync-card">
+                          <div className="sync-card-header">
+                            <strong>{calendar.name}</strong>
+                            <span>
+                              {calendar.id === appleIntegrationStatus.writableCalendarId ? "Target" : "Available"}
+                            </span>
+                          </div>
+                          <p className="small">{calendar.id}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="sheet-actions split">
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={handleAppleDisconnect}
+                        disabled={appleIntegrationMutating}
+                      >
+                        Disconnect
+                      </button>
+                      <div className="settings-actions">
+                        <button type="button" className="ghost-button" onClick={closeSettingsModal}>
+                          Close
+                        </button>
+                        <button type="submit" className="ghost-button" disabled={appleIntegrationMutating}>
+                          Save target
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </section>
           </aside>
         </div>
       )}

@@ -1785,6 +1785,33 @@ button.chip {
   width: min(42rem, calc(100vw - 1.4rem));
 }
 
+.settings-sheet {
+  width: min(42rem, calc(100vw - 1.4rem));
+}
+
+.settings-section {
+  margin-top: 0.95rem;
+}
+
+.settings-stack {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.settings-calendar-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.sheet-actions.split {
+  justify-content: space-between;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
 .sync-mode-toggle {
   display: flex;
   flex-wrap: wrap;
