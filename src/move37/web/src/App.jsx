@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useActivityGraph, useNotes } from "@move37/sdk/react";
+import { useActivityGraph, useNotes, useSchedulingReplan } from "@move37/sdk/react";
 import "./App.css";
 import {
   buildIndexes,
@@ -23,6 +23,18 @@ const SEARCH_PLACEHOLDER = "search:activity";
 const EMPTY_GRAPH = { nodes: [], dependencies: [], schedules: [] };
 const DEFAULT_VIEWPORT_STATE = getDefaultViewport({ width: 1200, height: 760 });
 const SURFACE_TRANSITION_MS = 160;
+const SYNC_MODE_COPY = {
+  dry_run: {
+    title: "Dry run",
+    description: "Compute a proposed schedule and review the changes before anything is written to calendars.",
+    actionLabel: "Run dry run",
+  },
+  apply: {
+    title: "Apply",
+    description: "Compute the new schedule, persist it in Move37, and sync the result to connected calendars.",
+    actionLabel: "Apply plan",
+  },
+};
 const LINEAR_TITLE_COLLATOR = new Intl.Collator("en", {
   numeric: true,
   sensitivity: "base",
@@ -114,6 +126,50 @@ function compareLinearNodes(left, right) {
   }
 
   return LINEAR_TITLE_COLLATOR.compare(left?.title || "", right?.title || "");
+}
+
+function formatScheduleTimestamp(value) {
+  if (!value) {
+    return "Not scheduled";
+  }
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(timestamp);
+}
+
+function formatDeltaMinutes(value) {
+  if (value == null) {
+    return "Scheduled";
+  }
+  if (value === 0) {
+    return "No change";
+  }
+  const sign = value > 0 ? "+" : "-";
+  const absoluteMinutes = Math.abs(value);
+  if (absoluteMinutes % 1440 === 0) {
+    return `${sign}${absoluteMinutes / 1440}d`;
+  }
+  if (absoluteMinutes >= 60 && absoluteMinutes % 60 === 0) {
+    return `${sign}${absoluteMinutes / 60}h`;
+  }
+  return `${sign}${absoluteMinutes}m`;
+}
+
+function formatSchedulingCode(code) {
+  const normalized = String(code || "")
+    .replaceAll("_", " ")
+    .trim();
+  if (!normalized) {
+    return "Scheduling issue";
+  }
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 function interpolateProjectedGraphs(fromProjected, toProjected, nodes, progress) {
@@ -1309,6 +1365,11 @@ export default function App() {
     importTxtNotes,
     updateNote,
   } = useNotes(apiOptions);
+  const {
+    loading: syncPending,
+    run: runSchedulingReplan,
+    clear: clearSchedulingRun,
+  } = useSchedulingReplan(apiOptions);
   const [graph, setGraph] = useState(() => sanitizeGraph(EMPTY_GRAPH));
   const [transition, setTransition] = useState(null);
   const [modeMorph, setModeMorph] = useState(null);
@@ -1334,6 +1395,10 @@ export default function App() {
   const [contextMenu, setContextMenu] = useState(null);
   const [sheet, setSheet] = useState(null);
   const [form, setForm] = useState(defaultForm(null));
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [syncRunMode, setSyncRunMode] = useState("dry_run");
+  const [syncResult, setSyncResult] = useState(null);
+  const [syncError, setSyncError] = useState("");
   const [leftPanel, setLeftPanel] = useState(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [activeNote, setActiveNote] = useState(null);
@@ -1437,6 +1502,10 @@ export default function App() {
       if (event.key !== "Escape") {
         return;
       }
+      if (syncModalOpen) {
+        closeSyncModal();
+        return;
+      }
       if (sheet) {
         closeSheet();
         return;
@@ -1451,7 +1520,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [contextMenu, displayedSurfaceMode, sheet, surfaceClosingMode, surfaceMode]);
+  }, [contextMenu, displayedSurfaceMode, sheet, surfaceClosingMode, surfaceMode, syncModalOpen]);
 
   useEffect(() => {
     const shouldRotate3D =
@@ -2360,6 +2429,43 @@ export default function App() {
   function closeSheet() {
     setSheet(null);
     setForm(defaultForm(null));
+  }
+
+  function resetSyncState(nextMode = "dry_run") {
+    setSyncRunMode(nextMode);
+    setSyncResult(null);
+    setSyncError("");
+    clearSchedulingRun();
+  }
+
+  function openSyncModal() {
+    setContextMenu(null);
+    setIsImportMenuExpanded(false);
+    setIsModeMenuExpanded(false);
+    resetSyncState();
+    setSyncModalOpen(true);
+  }
+
+  function closeSyncModal() {
+    setSyncModalOpen(false);
+    resetSyncState();
+  }
+
+  async function submitSyncPlan(event) {
+    event.preventDefault();
+    setSyncError("");
+    try {
+      const nextResult = await runSchedulingReplan({
+        mode: syncRunMode,
+        parameters: {},
+      });
+      setSyncResult(nextResult);
+      if (syncRunMode === "apply") {
+        await reloadGraph();
+      }
+    } catch (nextError) {
+      setSyncError(nextError instanceof Error ? nextError.message : String(nextError));
+    }
   }
 
   function isBackgroundTarget(target, currentTarget) {
@@ -3444,6 +3550,15 @@ export default function App() {
             </button>
             <button
               type="button"
+              className={`dock-button ${syncModalOpen ? "active" : ""}`}
+              onClick={openSyncModal}
+              aria-label="Open sync and replan controls"
+              title="Sync / Replan"
+            >
+              <CalendarIcon />
+            </button>
+            <button
+              type="button"
               className={`dock-button ${leftPanel === "note-editor" ? "active" : ""}`}
               onClick={() => {
                 if (leftPanel === "note-editor") {
@@ -3593,6 +3708,171 @@ export default function App() {
               />
             </label>
           </form>
+        </div>
+      )}
+
+      {syncModalOpen && (
+        <div className="sheet-backdrop" onPointerDown={closeSyncModal}>
+          <aside className="sheet sync-sheet" onPointerDown={(event) => event.stopPropagation()}>
+            <h2>Sync / Replan</h2>
+            <p>
+              Run the scheduling engine against the current graph and push the final result to calendars only when
+              you choose <strong>Apply</strong>.
+            </p>
+            <form className="sheet-form" onSubmit={submitSyncPlan}>
+              <div className="sync-mode-toggle" role="tablist" aria-label="Scheduling run mode">
+                {Object.entries(SYNC_MODE_COPY).map(([mode, copy]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`ghost-button sync-mode-button ${syncRunMode === mode ? "active" : ""}`}
+                    onClick={() => {
+                      setSyncRunMode(mode);
+                      setSyncResult(null);
+                      setSyncError("");
+                      clearSchedulingRun();
+                    }}
+                  >
+                    {copy.title}
+                  </button>
+                ))}
+              </div>
+              <p className="small">{SYNC_MODE_COPY[syncRunMode].description}</p>
+              {syncError ? <div className="sync-feedback error">{syncError}</div> : null}
+              {syncPending ? <div className="sync-feedback">Running scheduling engine…</div> : null}
+              {syncResult ? (
+                <div className="sync-results">
+                  <p className="notes-overlay-status">
+                    {syncResult.runMetadata.applied ? "Applied" : "Preview"} · {syncResult.runMetadata.engine}
+                  </p>
+                  {syncResult.status === "infeasible" ? (
+                    <div className="sync-feedback error">
+                      This schedule is infeasible with the current constraints. Review the conflicts below before applying.
+                    </div>
+                  ) : null}
+                  <div className="metric-grid">
+                    <div className="metric-card">
+                      <span>Moved tasks</span>
+                      <strong>{syncResult.summary.movedTasks}</strong>
+                    </div>
+                    <div className="metric-card">
+                      <span>Conflicts</span>
+                      <strong>{syncResult.summary.conflicts}</strong>
+                    </div>
+                    <div className="metric-card">
+                      <span>Unscheduled</span>
+                      <strong>{syncResult.summary.unscheduled}</strong>
+                    </div>
+                    <div className="metric-card">
+                      <span>Projects affected</span>
+                      <strong>{syncResult.summary.projectsAffected}</strong>
+                    </div>
+                  </div>
+
+                  <section className="sync-section">
+                    <div className="sync-section-header">
+                      <h3>Task changes</h3>
+                      <span>{syncResult.changes.length}</span>
+                    </div>
+                    {syncResult.changes.length ? (
+                      <div className="sync-list">
+                        {syncResult.changes.map((change) => (
+                          <article key={change.activityId} className="sync-card">
+                            <div className="sync-card-header">
+                              <strong>{change.title}</strong>
+                              <span>{formatDeltaMinutes(change.deltaMinutes)}</span>
+                            </div>
+                            <p className="small">
+                              {formatScheduleTimestamp(change.previousStartsAt)} → {formatScheduleTimestamp(change.proposedStartsAt)}
+                            </p>
+                            {change.branchRootId ? <p className="small">Branch root: {change.branchRootId}</p> : null}
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="small">No task moves were proposed.</p>
+                    )}
+                  </section>
+
+                  <section className="sync-section">
+                    <div className="sync-section-header">
+                      <h3>Conflicts</h3>
+                      <span>{syncResult.conflicts.length}</span>
+                    </div>
+                    {syncResult.conflicts.length ? (
+                      <div className="sync-list">
+                        {syncResult.conflicts.map((conflict) => (
+                          <article key={`${conflict.activityId}-${conflict.code}`} className="sync-card">
+                            <div className="sync-card-header">
+                              <strong>{conflict.title}</strong>
+                              <span>{formatSchedulingCode(conflict.code)}</span>
+                            </div>
+                            <p className="small">{conflict.message}</p>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="small">No hard conflicts detected in this run.</p>
+                    )}
+                  </section>
+
+                  <section className="sync-section">
+                    <div className="sync-section-header">
+                      <h3>Unscheduled</h3>
+                      <span>{syncResult.unscheduled.length}</span>
+                    </div>
+                    {syncResult.unscheduled.length ? (
+                      <div className="sync-list">
+                        {syncResult.unscheduled.map((item) => (
+                          <article key={`${item.activityId}-${item.code}`} className="sync-card">
+                            <div className="sync-card-header">
+                              <strong>{item.title}</strong>
+                              <span>{formatSchedulingCode(item.code)}</span>
+                            </div>
+                            <p className="small">{item.message}</p>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="small">Every task with enough data received a placement.</p>
+                    )}
+                  </section>
+
+                  <section className="sync-section">
+                    <div className="sync-section-header">
+                      <h3>Project impact</h3>
+                      <span>{syncResult.projectImpacts.length}</span>
+                    </div>
+                    {syncResult.projectImpacts.length ? (
+                      <div className="sync-list">
+                        {syncResult.projectImpacts.map((impact) => (
+                          <article key={impact.branchRootId} className="sync-card">
+                            <div className="sync-card-header">
+                              <strong>{impact.projectTitle}</strong>
+                              <span>{formatDeltaMinutes(impact.deltaMinutes)}</span>
+                            </div>
+                            <p className="small">
+                              {formatScheduleTimestamp(impact.previousCompletionAt)} → {formatScheduleTimestamp(impact.proposedCompletionAt)}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="small">No project completion shifts were detected.</p>
+                    )}
+                  </section>
+                </div>
+              ) : null}
+              <div className="sheet-actions">
+                <button type="button" className="ghost-button" onClick={closeSyncModal}>
+                  Close
+                </button>
+                <button type="submit" className="ghost-button" disabled={syncPending}>
+                  {SYNC_MODE_COPY[syncRunMode].actionLabel}
+                </button>
+              </div>
+            </form>
+          </aside>
         </div>
       )}
 

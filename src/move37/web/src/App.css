@@ -1781,6 +1781,101 @@ button.chip {
   resize: vertical;
 }
 
+.sync-sheet {
+  width: min(42rem, calc(100vw - 1.4rem));
+}
+
+.sync-mode-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.sync-mode-button.active {
+  border-color: #9fe8ff7a;
+  background: #153761f0;
+  box-shadow: 0 0 24px #6cd7ff20;
+}
+
+.sync-feedback {
+  border: 1px solid #8ec8ff24;
+  border-radius: 0.42rem;
+  background: #102040bf;
+  color: #d9ebff;
+  padding: 0.62rem 0.7rem;
+  font: 600 0.72rem/1.4 "IBM Plex Mono", "Courier New", monospace;
+}
+
+.sync-feedback.error {
+  border-color: #ff8f8f33;
+  background: #2c0d16e8;
+  color: #ffdbe2;
+}
+
+.sync-results {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.sync-section {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.sync-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sync-section-header h3 {
+  margin: 0;
+  color: #eff7ff;
+  font: 700 0.9rem/1.2 "Sora", "Avenir Next", sans-serif;
+}
+
+.sync-section-header span {
+  color: #9fb9db;
+  font: 700 0.68rem/1 "IBM Plex Mono", "Courier New", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sync-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.sync-card {
+  border: 1px solid #8ec8ff24;
+  border-radius: 0.42rem;
+  background: #102040bf;
+  padding: 0.62rem 0.7rem;
+}
+
+.sync-card p {
+  margin: 0.26rem 0 0;
+}
+
+.sync-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sync-card-header strong {
+  color: #eff7ff;
+}
+
+.sync-card-header span {
+  color: #9dc8ff;
+  font: 700 0.68rem/1 "IBM Plex Mono", "Courier New", monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .choice-list {
   display: grid;
   gap: 0.4rem;
