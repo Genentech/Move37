@@ -10,11 +10,17 @@ Candidates are expected to work on a bounded GitHub issue, use AI assistance as 
 
 This assessment is intentionally run in a public GitHub repository because it better reflects day-to-day software engineering than a puzzle or whiteboard exercise. It lets candidates work in a native environment with real issues, real constraints, and real review artifacts.
 
-If you are completing this exercise, start by reading the section called `The Exercise` below. If you want to understand the product and the technical landscape first, the rest of this README introduces Move37 and its current state.
+**If you are completing this exercise, create an anonymous GitHub account and fork this repository before you start work. Do not use your normal GitHub identity or begin work from a non-anonymous clone. Revealing your identity to reviewers will automatically disqualify the submission.**
+
+Start by reading the section called `The Exercise` below. If you want to understand the product and the technical landscape first, the rest of this README introduces Move37 and its current state.
+
+## About Move37
 
 **Move37 is a personal planning system built around self-knowledge.**
 
-We are not always the best at estimating how long things take to be completed — this is not only due to unforeseen circumstances, but also because we do not know our own behaviour well enough: what drains us, what motivates us, what our real pace is versus our optimistic one.
+The name Move37 is a reference to AlphaGo's famous move 37, an unexpected decision that changed how people thought about what AI could do.
+
+In the same way, we are not always the best at judging our own plans. This is not only due to unforeseen circumstances, but also because we do not know our own behaviour well enough: what drains us, what motivates us, and what our real pace is versus our optimistic one.
 
 Move37 brings together personal notes and reflections, calendar commitments, a history of calendar behaviour, and financial behaviour to help us understand our own patterns. Over time, it learns what "I'll finish this by Friday" actually means for each of us individually — and helps us plan accordingly. Used in a team, it turns that self-knowledge into better coordination and productivity.
 
@@ -54,10 +60,11 @@ You are not being assessed on whether you hand-write every line of code yourself
 
 In practical terms, the exercise is simple:
 
-1. Choose an open GitHub issue that interests you
-2. Work it through end to end in your own fork
-3. Use coding agents as part of your workflow where helpful
-4. Submit a pull request that shows both the outcome and the reasoning behind it
+1. Create an anonymous GitHub account and fork this repository before doing any work
+2. Choose an open GitHub issue that interests you
+3. Work it through end to end in your own fork
+4. Use coding agents as part of your workflow where helpful
+5. Submit a pull request that shows both the outcome and the reasoning behind it
 
 We are particularly interested in signals such as:
 
@@ -69,7 +76,7 @@ We are particularly interested in signals such as:
 
 This is why the exercise runs in a public GitHub repository rather than as a puzzle or whiteboard task. It gives you a native environment with realistic constraints, existing code, issue threads, and review artifacts. That setting gives us a better signal of engineering judgment than a synthetic interview problem.
 
-Anonymity is a hard requirement. Please use an anonymous GitHub account for your fork and pull request. Revealing your identity to reviewers will automatically disqualify the submission.
+Anonymity is a hard requirement. Use an anonymous GitHub account for both the fork and the pull request, and set that up before you begin. Revealing your identity to reviewers will automatically disqualify the submission.
 
 The submission guide in `.github/pull_request_template.md` is part of the exercise. It asks you to document validation steps, prompt history, and important AI mistakes and corrections. Those are not extras. They are part of how we evaluate the work.
 
