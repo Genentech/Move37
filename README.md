@@ -10,6 +10,9 @@ The system is AI-native: every piece of information becomes something an agent c
 
 <img width="2068" height="1103" alt="image" src="https://github.com/user-attachments/assets/714165fb-52fc-4964-909d-8d310a62a468" />
 
+<img width="2068" height="1188" alt="image" src="https://github.com/user-attachments/assets/9c116541-e598-4e36-a52c-03ca7a38feb3" />
+
+
 <img width="2068" height="1103" alt="image" src="https://github.com/user-attachments/assets/983dced0-f8ab-47ed-b7c0-d89e9ee52ec0" />
 
 
