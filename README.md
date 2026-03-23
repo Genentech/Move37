@@ -8,6 +8,17 @@ Move37 brings together personal notes and reflections, calendar commitments, a h
 
 The system is AI-native: every piece of information becomes something an agent can reason over to assist with informed decisions.
 
+## Current State
+
+The web UI is in good shape. The backend is partially wired. Several core capabilities are still under active development:
+
+- **Apple Calendar sync** — the integration exists but is not yet fully connected end to end
+- **Scheduling engine** — the logic for reasoning about dependencies, timing, and estimated completion is not yet implemented
+- **OpenBanking** — financial behaviour data is not yet ingested or connected
+- **Note embeddings** — personal reflections are not yet embedded for semantic search
+
+These are the areas where the product has the most ground to cover, and where the most interesting contributions live.
+
 ---
 
 ## The Exercise
