@@ -8,6 +8,9 @@ Move37 brings together personal notes and reflections, calendar commitments, a h
 
 The system is AI-native: every piece of information becomes something an agent can reason over to assist with informed decisions.
 
+<img width="2068" height="1103" alt="image" src="https://github.com/user-attachments/assets/714165fb-52fc-4964-909d-8d310a62a468" />
+
+
 ## Current State
 
 The web UI is in good shape. The backend is partially wired. Several core capabilities are still under active development:
