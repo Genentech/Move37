@@ -1740,9 +1740,7 @@ export default function App() {
       }
       if (importPopoverMode === "url") {
         event.preventDefault();
-        setImportPopoverMode(null);
-        setUrlImportValue("");
-        setUrlImportLoading(false);
+        closeUrlImportCommand();
         setIsImportMenuExpanded(false);
         return;
       }
@@ -2458,12 +2456,21 @@ export default function App() {
     setSearchQuery("");
   }
 
-  function toggleImportMenu() {
+  function closeUrlImportCommand() {
     setImportPopoverMode(null);
+    setUrlImportValue("");
+    setUrlImportLoading(false);
+  }
+
+  function toggleImportMenu() {
+    closeUrlImportCommand();
     setIsImportMenuExpanded((value) => !value);
   }
 
   function openUrlImportPopover() {
+    setSyncModalOpen(false);
+    setSettingsModalOpen(false);
+    closeLeftPanel();
     setImportPopoverMode("url");
     setIsImportMenuExpanded(false);
   }
@@ -2509,6 +2516,8 @@ export default function App() {
     setIsImportMenuExpanded(false);
     setIsModeMenuExpanded(false);
     setSettingsModalOpen(false);
+    setImportPopoverMode(null);
+    closeLeftPanel();
     resetSyncState();
     setSyncModalOpen(true);
   }
@@ -2540,6 +2549,8 @@ export default function App() {
     setIsImportMenuExpanded(false);
     setIsModeMenuExpanded(false);
     setSyncModalOpen(false);
+    setImportPopoverMode(null);
+    closeLeftPanel();
     setSettingsError("");
     setSettingsModalOpen(true);
   }
@@ -2929,6 +2940,8 @@ export default function App() {
   }
 
   function openDraftNoteWorkspace() {
+    setSyncModalOpen(false);
+    setSettingsModalOpen(false);
     stopViewportTween();
     setContextMenu(null);
     setSelectedId(null);
@@ -3076,8 +3089,7 @@ export default function App() {
       const response = await importNoteFromUrl({ url });
       setGraph(sanitizeGraph(response.graph));
       await reloadGraph();
-      setImportPopoverMode(null);
-      setUrlImportValue("");
+      closeUrlImportCommand();
       setIsImportMenuExpanded(false);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
@@ -3527,15 +3539,6 @@ export default function App() {
               >
                 <SaveIcon />
               </button>
-              <button
-                type="button"
-                className="dock-button"
-                onClick={closeLeftPanel}
-                aria-label="Exit note editor"
-                title="Exit note editor"
-              >
-                <ExitIcon />
-              </button>
             </>
           ) : null}
           {selected && selected.kind !== "note" && !focusNodeId ? (
@@ -3689,7 +3692,7 @@ export default function App() {
             <button
               type="button"
               className={`dock-button ${syncModalOpen ? "active" : ""}`}
-              onClick={openSyncModal}
+              onClick={() => syncModalOpen ? closeSyncModal() : openSyncModal()}
               aria-label="Open sync and replan controls"
               title="Sync / Replan"
             >
@@ -3698,7 +3701,7 @@ export default function App() {
             <button
               type="button"
               className={`dock-button ${settingsModalOpen ? "active" : ""}`}
-              onClick={openSettingsModal}
+              onClick={() => settingsModalOpen ? closeSettingsModal() : openSettingsModal()}
               aria-label="Open settings"
               title="Settings"
             >
@@ -3732,23 +3735,49 @@ export default function App() {
               <div className="dock-import-actions" aria-hidden={!isImportMenuExpanded}>
                 <button
                   type="button"
-                  className="dock-subaction"
+                  className="dock-subaction icon-only"
                   onClick={triggerBrowseImport}
                   title="Browse .txt files"
+                  aria-label="Browse .txt files"
                 >
                   <ImportIcon />
-                  <span>Browse</span>
                 </button>
                 <button
                   type="button"
-                  className="dock-subaction"
+                  className="dock-subaction icon-only"
                   onClick={openUrlImportPopover}
                   title="Import from URL"
+                  aria-label="Import from URL"
                 >
                   <LinkIcon />
-                  <span>URL</span>
                 </button>
               </div>
+              {importPopoverMode === "url" ? (
+                <form
+                  className="dock-inline-panel"
+                  onSubmit={submitUrlImport}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <input
+                    ref={urlInputRef}
+                    type="url"
+                    value={urlImportValue}
+                    onChange={(event) => setUrlImportValue(event.target.value)}
+                    placeholder="https://example.com/note.txt"
+                    aria-label="Import note from URL"
+                  />
+                  <button
+                    type="button"
+                    className="uri-search-close"
+                    onClick={closeUrlImportCommand}
+                    aria-label="Close URL import"
+                    title="Close URL import"
+                    disabled={urlImportLoading}
+                  >
+                    <ExitIcon />
+                  </button>
+                </form>
+              ) : null}
               <input
                 ref={browseInputRef}
                 type="file"
@@ -3803,51 +3832,6 @@ export default function App() {
               onChange={(event) => setNoteDraft(event.target.value)}
               placeholder={`Title on the first line\n\nWrite the rest of the note below.`}
             />
-          </form>
-        </aside>
-      )}
-
-      {importPopoverMode === "url" && (
-        <aside className="notes-overlay side-sheet-overlay" onClick={(event) => event.stopPropagation()}>
-          <form
-            className="notes-overlay-form side-sheet-form url-import-sidepanel"
-            onSubmit={submitUrlImport}
-          >
-            <div className="url-import-toolbar">
-              <button
-                type="submit"
-                className="overlay-icon-button"
-                aria-label="Import note from URL"
-                title="Import note from URL"
-                disabled={urlImportLoading}
-              >
-                <ImportIcon />
-              </button>
-              <button
-                type="button"
-                className="overlay-icon-button"
-                onClick={() => {
-                  setImportPopoverMode(null);
-                  setUrlImportValue("");
-                  setUrlImportLoading(false);
-                  setIsImportMenuExpanded(false);
-                }}
-                aria-label="Close URL import"
-                title="Close URL import"
-              >
-                <ExitIcon />
-              </button>
-            </div>
-            <label className="url-import-field">
-              <span>URL</span>
-              <input
-                ref={urlInputRef}
-                type="url"
-                value={urlImportValue}
-                onChange={(event) => setUrlImportValue(event.target.value)}
-                placeholder="https://example.com/note.txt"
-              />
-            </label>
           </form>
         </aside>
       )}
@@ -4005,9 +3989,6 @@ export default function App() {
                 </div>
               ) : null}
               <div className="sheet-actions">
-                <button type="button" className="ghost-button" onClick={closeSyncModal}>
-                  Close
-                </button>
                 <button type="submit" className="ghost-button" disabled={syncPending}>
                   {SYNC_MODE_COPY[syncRunMode].actionLabel}
                 </button>
@@ -4068,11 +4049,8 @@ export default function App() {
                     For iCloud, use an app-specific password from your Apple account security settings.
                   </p>
                   <div className="sheet-actions">
-                    <button type="button" className="ghost-button" onClick={closeSettingsModal}>
-                      Close
-                    </button>
-                    <button type="submit" className="ghost-button" disabled={appleIntegrationMutating}>
-                      Connect
+                    <button type="submit" className="ghost-button icon-only" title="Connect Apple Calendar" aria-label="Connect Apple Calendar" disabled={appleIntegrationMutating}>
+                      <LinkIcon />
                     </button>
                   </div>
                 </form>
@@ -4124,20 +4102,17 @@ export default function App() {
                     <div className="sheet-actions split">
                       <button
                         type="button"
-                        className="ghost-button"
+                        className="ghost-button icon-only"
                         onClick={handleAppleDisconnect}
                         disabled={appleIntegrationMutating}
+                        title="Disconnect Apple Calendar"
+                        aria-label="Disconnect Apple Calendar"
                       >
-                        Disconnect
+                        <ExitIcon />
                       </button>
-                      <div className="settings-actions">
-                        <button type="button" className="ghost-button" onClick={closeSettingsModal}>
-                          Close
-                        </button>
-                        <button type="submit" className="ghost-button" disabled={appleIntegrationMutating}>
-                          Save target
-                        </button>
-                      </div>
+                      <button type="submit" className="ghost-button" disabled={appleIntegrationMutating}>
+                        Save target
+                      </button>
                     </div>
                   </form>
                 </div>
