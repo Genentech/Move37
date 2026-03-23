@@ -25,7 +25,9 @@ Move37 is not a single process. It is a small system with a few important bounda
 `src/move37/services/container.py` wires the main runtime:
 
 - SQLAlchemy session factory
+- `AppleCalendarSyncService`
 - `ActivityGraphService`
+- `SchedulingService`
 - `NoteService`
 - `ChatSessionService`
 - `Move37AiClient`
@@ -34,12 +36,19 @@ That last point matters: the main API does not answer note search or chat itself
 
 ## REST and MCP surfaces
 
-REST routes currently cover four broad areas:
+REST routes currently cover six broad areas:
 
 - auth
 - graph
 - notes
 - calendar
+- integrations
+- scheduling
+
+The calendar-related REST surface is split in two:
+
+- `/calendars/apple/*` covers event listing and reconciliation
+- `/integrations/apple/*` covers account connection, status, and preferences
 
 MCP routes are exposed separately, and chat now lives there rather than in the browser or REST surface. If you change a service contract or persistence rule, think about both transports.
 
