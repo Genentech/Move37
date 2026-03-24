@@ -317,9 +317,12 @@
   animation: spherePulse 1.1s ease-in-out infinite;
 }
 
+.sphere-glow,
 .sphere-glow-success,
 .sphere-glow-failure {
   opacity: 0;
+  mix-blend-mode: screen;
+  filter: saturate(1.24);
   transition: opacity 900ms ease;
 }
 
