@@ -4136,10 +4136,12 @@ export default function App() {
         <svg viewBox={`0 0 ${size.width} ${size.height}`} role="img">
           <defs>
             <radialGradient id="sphere-halo" cx="50%" cy="50%">
-              <stop offset="58%" stopColor="#86cbff" stopOpacity="0" />
-              <stop offset="74%" stopColor="#7cc9ff" stopOpacity="0.2" />
-              <stop offset="84%" stopColor="#5ca6f5" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="#2a4f8f" stopOpacity="0" />
+              <stop offset="58%" stopColor="#7ee8ff" stopOpacity="0" />
+              <stop offset="71%" stopColor="#63d8ff" stopOpacity="0.34" />
+              <stop offset="81%" stopColor="#369eff" stopOpacity="0.26" />
+              <stop offset="90%" stopColor="#1d63d6" stopOpacity="0.16" />
+              <stop offset="96%" stopColor="#143a8a" stopOpacity="0.08" />
+              <stop offset="100%" stopColor="#0d2148" stopOpacity="0" />
             </radialGradient>
             <radialGradient id="sphere-halo-success" cx="50%" cy="50%">
               <stop offset="58%" stopColor="#3dff8f" stopOpacity="0" />
