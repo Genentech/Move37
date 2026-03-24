@@ -105,5 +105,6 @@ The desired repository ruleset in `devtools/config/move37.repo.toml` currently l
 - `python`
 - `sdk`
 - `web`
+- `contributor-docs`
 
-That means the contributor-docs build exists in CI, but it is not yet declared as a required status check in the repo bootstrap config.
+That means contributor docs changes are part of the expected branch protection baseline, not just an optional CI signal.
