@@ -10,6 +10,8 @@ navigation:
         path: ./pages/sdks.mdx
       - page: CLI
         path: ./pages/cli.mdx
+      - page: Apple Calendar
+        path: ./pages/apple-calendar.mdx
   - api: API Reference
     snippets:
       typescript: "@move37/sdk"
