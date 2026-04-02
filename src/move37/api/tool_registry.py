@@ -47,13 +47,7 @@ class McpToolRegistry:
                 "Replace an activity's dependencies.",
                 schemas.ReplaceActivityDependenciesInput,
             ),
-            ToolDefinition(
-                "activity.schedule.replace",
-                "Replace derived schedule edges for an activity.",
-                schemas.ReplaceActivityScheduleInput,
-            ),
             ToolDefinition("dependency.delete", "Delete a dependency edge.", schemas.DependencyEdgeInput),
-            ToolDefinition("schedule.delete", "Delete a schedule edge.", schemas.ScheduleEdgeInput),
             ToolDefinition("note.create", "Create a note and linked graph node.", schemas.NotePayload),
             ToolDefinition("note.update", "Update a note and linked graph node.", schemas.UpdateNoteInput),
             ToolDefinition("note.get", "Fetch a note.", schemas.NoteIdInput),
@@ -75,9 +69,7 @@ class McpToolRegistry:
             "activity.fork": self._handle_activity_fork,
             "activity.delete": self._handle_activity_delete,
             "activity.dependencies.replace": self._handle_activity_dependencies_replace,
-            "activity.schedule.replace": self._handle_activity_schedule_replace,
             "dependency.delete": self._handle_dependency_delete,
-            "schedule.delete": self._handle_schedule_delete,
             "note.create": self._handle_note_create,
             "note.update": self._handle_note_update,
             "note.get": self._handle_note_get,
@@ -193,16 +185,6 @@ class McpToolRegistry:
             )
         ).model_dump()
 
-    def _handle_activity_schedule_replace(self, subject: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        payload = schemas.ReplaceActivityScheduleInput.model_validate(arguments)
-        return schemas.ActivityGraphOutput(
-            **self._services.activity_graph_service.replace_schedule(
-                subject,
-                payload.activityId,
-                [],
-            )
-        ).model_dump()
-
     def _handle_dependency_delete(self, subject: str, arguments: dict[str, Any]) -> dict[str, Any]:
         payload = schemas.DependencyEdgeInput.model_validate(arguments)
         return schemas.ActivityGraphOutput(
@@ -210,16 +192,6 @@ class McpToolRegistry:
                 subject,
                 payload.parentId,
                 payload.childId,
-            )
-        ).model_dump()
-
-    def _handle_schedule_delete(self, subject: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        payload = schemas.ScheduleEdgeInput.model_validate(arguments)
-        return schemas.ActivityGraphOutput(
-            **self._services.activity_graph_service.delete_schedule(
-                subject,
-                payload.earlierId,
-                payload.laterId,
             )
         ).model_dump()
 

@@ -162,26 +162,11 @@ export class Move37Client {
     });
   }
 
-  replaceSchedule(activityId, peers) {
-    this.logOperation("replaceSchedule", { activityId, peers });
-    return this.request("PUT", `/v1/activities/${encodeURIComponent(activityId)}/schedule`, {
-      body: { peers },
-    });
-  }
-
   deleteDependency(parentId, childId) {
     this.logOperation("deleteDependency", { parentId, childId });
     return this.request(
       "DELETE",
       `/v1/dependencies/${encodeURIComponent(parentId)}/${encodeURIComponent(childId)}`,
-    );
-  }
-
-  deleteSchedule(earlierId, laterId) {
-    this.logOperation("deleteSchedule", { earlierId, laterId });
-    return this.request(
-      "DELETE",
-      `/v1/schedules/${encodeURIComponent(earlierId)}/${encodeURIComponent(laterId)}`,
     );
   }
 

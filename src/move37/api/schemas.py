@@ -530,12 +530,6 @@ class ReplaceActivityDependenciesInput(ReplaceDependenciesInput):
     activityId: str
 
 
-class ReplaceActivityScheduleInput(ReplaceScheduleInput):
-    """Activity schedule replacement tool payload."""
-
-    activityId: str
-
-
 class DependencyEdgeInput(BaseModel):
     """Dependency edge payload."""
 
@@ -543,15 +537,6 @@ class DependencyEdgeInput(BaseModel):
 
     parentId: str
     childId: str
-
-
-class ScheduleEdgeInput(BaseModel):
-    """Schedule edge payload."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    earlierId: str
-    laterId: str
 
 
 NoteCreateResponse.model_rebuild()

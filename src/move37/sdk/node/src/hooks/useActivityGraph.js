@@ -100,12 +100,8 @@ export function useActivityGraph(options) {
       runStructuralMutation(() => client.deleteActivity(activityId, deleteTree)),
     replaceDependencies: (activityId, parentIds) =>
       runStructuralMutation(() => client.replaceDependencies(activityId, parentIds)),
-    replaceSchedule: (activityId, peers) =>
-      runStructuralMutation(() => client.replaceSchedule(activityId, peers)),
     deleteDependency: (parentId, childId) =>
       runStructuralMutation(() => client.deleteDependency(parentId, childId)),
-    deleteSchedule: (earlierId, laterId) =>
-      runStructuralMutation(() => client.deleteSchedule(earlierId, laterId)),
   };
 }
 

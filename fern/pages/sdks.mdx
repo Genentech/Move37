@@ -30,3 +30,7 @@ Generated output lands in:
 ## Existing SDK code
 
 The repository still contains a hand-written Node client in `src/move37/sdk/node`. Keep that in mind while migrating toward generated SDKs. During the transition, generated SDK output should be evaluated before replacing the current package surface.
+
+## Schedule edge mutations
+
+Schedule edges in Move37 are derived automatically from activity `startDate` values and the deterministic planner. The hand-written Node SDK intentionally omits `replaceSchedule` and `deleteSchedule` — use `updateActivity` with a new `startDate` or the `/v1/scheduling/replan` endpoint to change scheduling. The REST schedule mutation endpoints exist for backward compatibility but always return `409 Conflict`.

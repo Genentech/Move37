@@ -425,6 +425,11 @@ class ActivityGraphService:
         activity_id: str,
         peers: list[SchedulePeer],
     ) -> dict[str, Any]:
+        """Reject manual schedule replacement.
+
+        Schedule edges are derived from startDate by the deterministic planner.
+        This stub exists solely to back the legacy REST route with a clear error.
+        """
         del subject, activity_id, peers
         raise ConflictError("Manual schedule rules are derived from startDate and cannot be edited directly.")
 
@@ -439,6 +444,11 @@ class ActivityGraphService:
         return self._save_graph(subject, snapshot)
 
     def delete_schedule(self, subject: str, earlier_id: str, later_id: str) -> dict[str, Any]:
+        """Reject manual schedule deletion.
+
+        Schedule edges are derived from startDate by the deterministic planner.
+        This stub exists solely to back the legacy REST route with a clear error.
+        """
         del subject, earlier_id, later_id
         raise ConflictError("Manual schedule rules are derived from startDate and cannot be deleted directly.")
 

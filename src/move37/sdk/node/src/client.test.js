@@ -137,6 +137,16 @@ describe("Move37Client", () => {
     );
   });
 
+  it("does not expose replaceSchedule", () => {
+    const client = new Move37Client({ baseUrl: "", fetchImpl: vi.fn() });
+    expect(client.replaceSchedule).toBeUndefined();
+  });
+
+  it("does not expose deleteSchedule", () => {
+    const client = new Move37Client({ baseUrl: "", fetchImpl: vi.fn() });
+    expect(client.deleteSchedule).toBeUndefined();
+  });
+
   it("posts Apple Calendar connect payloads as JSON", async () => {
     const fetchImpl = vi.fn(async () => ({
       ok: true,
