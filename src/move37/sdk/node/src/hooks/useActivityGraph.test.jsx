@@ -33,6 +33,26 @@ describe("useActivityGraph", () => {
     expect(result.current.graph.nodes).toHaveLength(1);
   });
 
+  it("does not expose replaceSchedule or deleteSchedule", async () => {
+    const fetchImpl = vi.fn(async () =>
+      createJsonResponse({
+        graphId: 1,
+        version: 1,
+        nodes: [],
+        dependencies: [],
+        schedules: [],
+      }),
+    );
+
+    const { result } = renderHook(() =>
+      useActivityGraph({ baseUrl: "", token: "token", fetchImpl }),
+    );
+
+    await waitFor(() => expect(result.current.graph).not.toBeNull());
+    expect(result.current.replaceSchedule).toBeUndefined();
+    expect(result.current.deleteSchedule).toBeUndefined();
+  });
+
   it("replaces the graph after a structural mutation", async () => {
     const fetchImpl = vi
       .fn()

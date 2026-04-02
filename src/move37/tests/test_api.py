@@ -334,6 +334,37 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(api_response.status_code, 503)
         self.assertEqual(api_response.json()["detail"], "AI service unavailable.")
 
+    def test_mcp_tools_list_omits_unsupported_schedule_tools(self) -> None:
+        response = self.client.post(
+            "/v1/mcp/sse",
+            headers={"Authorization": "Bearer test-token"},
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        tool_names = [t["name"] for t in response.json()["result"]["tools"]]
+        self.assertNotIn("activity.schedule.replace", tool_names)
+        self.assertNotIn("schedule.delete", tool_names)
+
+    def test_rest_replace_schedule_returns_409(self) -> None:
+        response = self.client.put(
+            "/v1/activities/any-id/schedule",
+            headers={"Authorization": "Bearer test-token"},
+            json={"peers": []},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("derived from startDate", response.json()["detail"])
+
+    def test_rest_delete_schedule_returns_409(self) -> None:
+        response = self.client.delete(
+            "/v1/schedules/a/b",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("derived from startDate", response.json()["detail"])
+
 
 if __name__ == "__main__":
     unittest.main()
