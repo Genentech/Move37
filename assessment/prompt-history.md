@@ -45,3 +45,5 @@ Chronological record of key prompts used with the coding assistant during this a
 **Prompt 19:** Integrate this into the original plan .md.
 
 **Prompt 20:** Implement stretch 2 goals. Ensure all validation checklist items are met.
+
+**Prompt 21:** Create the PR. Move the two plans and the prompt history to a tmp/ folder and reference these in the PR. Read the PR instructions in detail to ensure that you meet all of the criteria.
