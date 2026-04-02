@@ -37,3 +37,11 @@ Chronological record of key prompts used with the coding assistant during this a
 **Prompt 15:** Review what has been done. Detail what changes have been made, their impact on the repo's functionality and how I can see this for myself.
 
 **Prompt 16:** Implement the stretch goals and the validation checklist associated with it.
+
+**Prompt 17:** Are there any more challenging stretch goals that we can add to this plan?
+
+**Prompt 18:** Add S4, S5, S6 to the plan as stretch 2. Come up with a validation checklist to ensure these are correct and do not break anything.
+
+**Prompt 19:** Integrate this into the original plan .md.
+
+**Prompt 20:** Implement stretch 2 goals. Ensure all validation checklist items are met.

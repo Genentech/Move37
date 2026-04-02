@@ -183,14 +183,20 @@ def activity_replace_dependencies(
     return ActivityGraphOutput(**result)
 
 
-@router.put("/activities/{activity_id}/schedule", response_model=ActivityGraphOutput)
+@router.put(
+    "/activities/{activity_id}/schedule",
+    response_model=ActivityGraphOutput,
+    deprecated=True,
+    description="Unsupported. Schedule edges are derived from startDate. Always returns 409.",
+    responses={409: {"description": "Schedule edges are derived from startDate and cannot be mutated directly."}},
+)
 def activity_replace_schedule(
     activity_id: str,
     payload: ReplaceScheduleInput,
     subject: Annotated[str, Depends(get_current_subject)],
     services: Annotated[ServiceContainer, Depends(get_service_container)],
 ) -> ActivityGraphOutput:
-    """Replace a node's schedule relations."""
+    """Replace a node's schedule relations (unsupported -- always returns 409)."""
 
     try:
         result = services.activity_graph_service.replace_schedule(
@@ -219,14 +225,20 @@ def dependency_delete(
     return ActivityGraphOutput(**result)
 
 
-@router.delete("/schedules/{earlier_id}/{later_id}", response_model=ActivityGraphOutput)
+@router.delete(
+    "/schedules/{earlier_id}/{later_id}",
+    response_model=ActivityGraphOutput,
+    deprecated=True,
+    description="Unsupported. Schedule edges are derived from startDate. Always returns 409.",
+    responses={409: {"description": "Schedule edges are derived from startDate and cannot be mutated directly."}},
+)
 def schedule_delete(
     earlier_id: str,
     later_id: str,
     subject: Annotated[str, Depends(get_current_subject)],
     services: Annotated[ServiceContainer, Depends(get_service_container)],
 ) -> ActivityGraphOutput:
-    """Delete a schedule edge."""
+    """Delete a schedule edge (unsupported -- always returns 409)."""
 
     try:
         result = services.activity_graph_service.delete_schedule(subject, earlier_id, later_id)
