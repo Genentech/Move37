@@ -365,6 +365,38 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertIn("derived from startDate", response.json()["detail"])
 
+    def test_mcp_tools_call_rejects_removed_schedule_replace(self) -> None:
+        response = self.client.post(
+            "/v1/mcp/sse",
+            headers={"Authorization": "Bearer test-token"},
+            json={
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": {"name": "activity.schedule.replace", "arguments": {}},
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["error"]["code"], -32001)
+        self.assertIn("Unknown tool", response.json()["error"]["message"])
+
+    def test_mcp_tools_call_rejects_removed_schedule_delete(self) -> None:
+        response = self.client.post(
+            "/v1/mcp/sse",
+            headers={"Authorization": "Bearer test-token"},
+            json={
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {"name": "schedule.delete", "arguments": {}},
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["error"]["code"], -32001)
+        self.assertIn("Unknown tool", response.json()["error"]["message"])
+
 
 if __name__ == "__main__":
     unittest.main()

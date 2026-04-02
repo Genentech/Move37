@@ -33,3 +33,7 @@ Chronological record of key prompts used with the coding assistant during this a
 **Prompt 13:** Begin executing the core requirements. After you have done C1-4, run all tests laid out in the validation checklist. Make a note of those that fail for my reference and iterate until all tests have passed. Do not commit any code without checking with me first.
 
 **Prompt 14:** If all tests are passing and the validation checklist has been met, commit the changes and then proceed with the additional section.
+
+**Prompt 15:** Review what has been done. Detail what changes have been made, their impact on the repo's functionality and how I can see this for myself.
+
+**Prompt 16:** Implement the stretch goals and the validation checklist associated with it.
